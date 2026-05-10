@@ -1,0 +1,18 @@
+[Unit]
+Description=Hermes Agent Gateway (abyz-lab)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=raspi5p
+WorkingDirectory=/home/raspi5p/workspace/openproject-stack
+EnvironmentFile=/home/raspi5p/.hermes/.env
+ExecStart=/home/raspi5p/.local/bin/hermes gateway
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

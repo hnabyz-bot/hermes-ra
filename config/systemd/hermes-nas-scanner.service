@@ -1,0 +1,13 @@
+[Unit]
+Description=Hermes NAS Scanner API Server
+After=network.target
+
+[Service]
+Type=simple
+User=raspi5p
+ExecStart=/usr/bin/python3 /opt/hermes/nas_scanner.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
