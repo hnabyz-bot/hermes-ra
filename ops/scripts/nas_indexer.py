@@ -229,8 +229,33 @@ def index_file(conn, filepath):
     return f"ok({len(new_ids)}chunks)"
 
 
-def run():
+def qdrant_point_count():
+    try:
+        req = urllib.request.Request(f"{QDRANT_URL}/collections/{COLLECTION}")
+        resp = json.loads(urllib.request.urlopen(req, timeout=5).read())
+        return resp.get("result", {}).get("points_count", 0)
+    except Exception:
+        return -1
+
+
+def run(force_reindex=False):
     conn = init_db()
+
+    # 신규 PC 안전장치: DB에 기록은 있으나 Qdrant가 비어있으면 자동 경고
+    if not force_reindex:
+        db_count = conn.execute("SELECT COUNT(*) FROM indexed_files").fetchone()[0]
+        qdrant_count = qdrant_point_count()
+        if db_count > 0 and qdrant_count == 0:
+            print("[warn] ⚠️  indexer_state.db에 기록이 있으나 Qdrant가 비어있습니다.")
+            print("[warn] 신규 PC 이전 상황으로 판단됩니다.")
+            print("[warn] --force-reindex 로 재실행하거나 qdrant_restore.sh 로 스냅샷을 복원하세요.")
+            sys.exit(1)
+
+    if force_reindex:
+        print("[reindex] indexer_state.db 초기화 후 전체 재인덱싱")
+        conn.execute("DELETE FROM indexed_files")
+        conn.commit()
+
     stats = {}
     t0 = time.time()
 
@@ -262,4 +287,5 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    force = "--force-reindex" in sys.argv or "--reindex" in sys.argv
+    run(force_reindex=force)

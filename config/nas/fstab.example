@@ -1,0 +1,8 @@
+# /etc/fstab — NAS 마운트 항목
+# NAS IP: 100.126.59.10 (Tailscale), Share: DR_Dev → /mnt/nas-ra
+# 자격증명: /etc/samba/nas-ra.creds (nas-ra.creds.example 참고)
+
+//100.126.59.10/DR_Dev /mnt/nas-ra cifs credentials=/etc/samba/nas-ra.creds,uid=raspi5p,gid=raspi5p,iocharset=utf8,vers=3.0,_netdev 0 0
+
+# 마운트 명령: sudo mount /mnt/nas-ra
+# 마운트 해제: sudo umount /mnt/nas-ra
