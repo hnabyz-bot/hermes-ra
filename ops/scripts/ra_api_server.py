@@ -471,33 +471,39 @@ def _run_ollama_analyze(prompt):
 
 
 def _run_wp_comment(analysis_dict, nas_refs, attachment_text):
+    # NAS 문서: 상위 3개만, 각 발췌 200자로 제한 (프롬프트 길이 최적화)
     nas_text = "\n".join(
-        f"- `{r['path']}` (score: {r['score']})\n  발췌: {r['excerpt']}"
-        for r in nas_refs
+        f"- `{r['path']}` (score: {r['score']:.2f})\n  {r['excerpt'][:200]}"
+        for r in (nas_refs[:3] if nas_refs else [])
     ) if nas_refs else "관련 NAS 문서 없음"
 
-    analysis_text = json.dumps(analysis_dict, ensure_ascii=False, indent=2)
-    att_text = (attachment_text or "없음")[:1500]
+    # 프롬프트 최적화: JSON 전체 대신 핵심 정보만 압축 형식으로 (토큰 수 1/4 감소)
+    analysis_compact = (
+        f"업무: {analysis_dict.get('task_type', '미분류')}\n"
+        f"기관: {analysis_dict.get('org', '')}\n"
+        f"지역: {analysis_dict.get('region', '')}\n"
+        f"기한: {analysis_dict.get('deadline', 'N/A')}\n"
+        f"우선순위: {analysis_dict.get('priority', '')}\n"
+        f"요약: {analysis_dict.get('summary', '')[:400]}"
+    )
+    att_text = (attachment_text or "없음")[:800]
 
-    # .format() 대신 직접 문자열 연결 — JSON의 중괄호가 format placeholder로 해석되는 KeyError 방지
     prompt = (
-        "당신은 의료기기 RA 전담 에이전트입니다.\n"
-        "아래 정보를 바탕으로 RA 담당자가 즉시 업무를 시작할 수 있도록 "
-        "마크다운 형식의 체크리스트와 관련 문서 가이드를 작성하세요.\n\n"
-        "[요청 분석 결과]\n" + analysis_text + "\n\n"
-        "[관련 NAS 문서]\n" + nas_text + "\n\n"
-        "[첨부파일 내용]\n" + att_text + "\n\n"
-        "출력 형식 (마크다운):\n"
+        "의료기기 RA 전담 에이전트로서 업무 체크리스트를 마크다운으로 작성하세요.\n\n"
+        "[정보]\n" + analysis_compact + "\n\n"
+        "[관련 문서]\n" + nas_text + "\n\n"
+        "[첨부]\n" + att_text + "\n\n"
+        "형식:\n"
         "## 🤖 Hermes RA 가이드\n\n"
-        "### 요청 분석\n(3줄 요약)\n\n"
-        "### 업무 체크리스트\n1. ...\n2. ...\n3. ...\n\n"
-        "### 관련 NAS 문서\n- `파일경로` — 발췌: ..."
+        "### 분석\n(2줄)\n\n"
+        "### 체크리스트\n1. 항목\n2. 항목\n3. 항목\n\n"
+        "### 문서\n- 파일경로 — 발췌"
     )
     if GLM_API_KEY:
-        raw = call_glm("glm-4.5-air", prompt, max_tokens=1500)
+        raw = call_glm("glm-4.5-air", prompt, max_tokens=3000)
         if raw:
             return re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
-        print("[warn] GLM wp_comment 실패", flush=True)
+        print(f"[warn] GLM wp_comment 실패 (프롬프트: {len(prompt)} chars)", flush=True)
     return "## Hermes RA 가이드\n\n(wp_comment 생성 실패 — 분석 결과 참고)"
 
 

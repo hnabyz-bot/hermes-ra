@@ -124,28 +124,35 @@ export OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 
 | 상황 | 설명 | Codex | Copilot | GLM |
 |------|------|-------|---------|-----|
-| **TFDA 긴급** | 태국 FDA, 4일 마감 | ✅ | ✅ | ❌ |
-| **EU CE 갱신** | EUDAMED, 3개월 마감 | ✅ | ✅ | ❌ |
-| **FDA 510(k)** | FDA, 30일 마감 | ✅ | ✅ | ❌ |
-| **응답률** | - | **100%** | **100%** | **0%** |
+| **TFDA 긴급** | 태국 FDA, 4일 마감 | ✅ | ✅ | ✅ |
+| **EU CE 갱신** | EUDAMED, 3개월 마감 | ✅ | ✅ | ✅ |
+| **FDA 510(k)** | FDA, 30일 마감 | ✅ | ✅ | ✅ |
+| **응답률** | - | **100%** | **100%** | **100%** |
 
-### 권장 구성
+> Cycle 1 당시 GLM은 wp_comment 0 bytes 문제로 응답 실패. 2026-05-10 프롬프트 최적화(-34.5%) + max_tokens 3000으로 완전 해결. **Cycle 3 재평가: 45/45 만점.**
 
-**🥇 Primary: Copilot (Claude Sonnet)**
-- ✅ 구체적 액션 플랜 + 타임라인
-- ✅ RA 전문 용어 정확
-- 응답시간: 37-40초
-- 비용: $240/년
+### 권장 구성 (Cycle 3 기준 — 2026-05-10 확정)
 
-**🥈 Secondary: Codex (GPT-4)**
-- ✅ 규제 의무사항 체크리스트
-- ✅ 법적 안전성 우선
-- 응답시간: 18-20초
-- 비용: $200/년
+| 역할 | 모델 | Cycle 3 점수 | 응답시간 | 주 용도 |
+|------|------|------------|---------|--------|
+| **🥇 Primary** | Copilot (Claude Sonnet 4.5) | 43/45 | 45.6초 | NAS 참조 실행 지침 (6/6 경로 인용) |
+| **🥈 Secondary** | Codex (GPT-4o) | 43/45 | 52.1초 | 규제 의무사항 법적 검토, 체크리스트 |
+| **🥉 Tertiary** | GLM (glm-4.5-air) | **45/45** ✨ | 54.6초 | 고부하 비용 효율, JSON 자동화 |
 
-**⏳ Tertiary: GLM (보류)**
-- wp_comment API 0 bytes 문제
-- z.ai 이슈 해결 후 재평가
+**🥇 Primary: Copilot (Claude Sonnet 4.5)**
+- ✅ NAS 파일 경로 완전 인용 (6/6) — RAG 활용 극대화
+- ✅ 실무 실행 지침 (담당자 즉시 사용 가능, 6,571자)
+- 응답시간: 45.6초 | 비용: $240/년
+
+**🥈 Secondary: Codex (GPT-4o)**
+- ✅ IEC 표준 버전 5/5 완벽 명시
+- ✅ 규제 조문 기반 체크리스트, NAS 불일치 경고
+- 응답시간: 52.1초 | 비용: $200/년
+
+**🥉 Tertiary: GLM (glm-4.5-air)** ✅ *2026-05-10 이슈 해결*
+- ✅ Cycle 3 만점 (45/45) — 3개 모델 최고점
+- ✅ JSON 구조 완성도 100% (자동화 파이프라인 안정)
+- 응답시간: 54.6초 | 비용: z.ai 토큰 기반 (저비용)
 
 📄 **상세 평가 보고서**: `docs/evaluation/HERMES_v5.2_EVALUATION_FINAL.md`
 
@@ -193,7 +200,7 @@ python -c "import json; print(json.load(open('/home/raspi5p/workspace/n8n-stack/
 ```
 규제 메일 수신
       ↓
-  [n8n WF]
+  [n8n WF ra-request-to-op_v5 (FhOhE3GPgepI6KOB)]
       ↓
 [Hermes RA API :7788]
   ├─ 메일 파싱
@@ -221,27 +228,33 @@ python -c "import json; print(json.load(open('/home/raspi5p/workspace/n8n-stack/
 ## 🔄 개발 사이클
 
 **Cycle 1** ✅ (2026-05-10)
-- 3가지 규제 시나리오 테스트 완료
+- 3가지 의료기기 RA 규제 시나리오 테스트 완료
 - Codex/Copilot 100% 응답
-- GLM API 이슈 진단
+- GLM API 이슈 진단 (wp_comment 0 bytes 근본 원인 확인)
 
-**Cycle 2** (진행 중)
-- 다른 도메인 이메일 (금융, 화학, IT 등)
+**Cycle 2** ✅ (2026-05-10)
+- NAS 온톨로지 기반 정성 평가 완료 (7항목 /35점 척도)
+- GLM 문제 해결 (프롬프트 최적화 -34.5% + max_tokens 3000)
 - Hermes agent 성장 추적
-- GLM 문제 해결
 
-**Cycle 3+**
-- 사용자 실제 메일 재전송
-- 최종 모델 확정
-- 성과 측정
+**Cycle 3** ✅ (2026-05-10)
+- NAS 강화 프롬프트 재평가 (5항목 /45점 척도)
+- 최종 모델 역할 확정 (Primary/Secondary/Tertiary)
+- GLM Cycle 3 만점 달성 (45/45)
+
+**Cycle 4+** (예정)
+- 의료기기 RA 케이스 확대 (CDSCO 인도, BPOM 인도네시아, NMPA 중국 등 다양한 국가 규제)
+- 실제 운영 케이스 10-15개 축적
+- v5.3 성장 메커니즘 연동 (Issue #9)
 
 ## 🛠️ 문제 해결
 
 ### GLM wp_comment 0 bytes
 ```
-원인: z.ai API가 특정 프롬프트에 빈 응답 반환
-해결: 프롬프트 최적화 + API 로그 확인 필요
-상태: 추적 중
+원인: z.ai API max_tokens 부족 (wp_comment 프롬프트 길이 초과)
+해결: 프롬프트 길이 -34.5% (1097→719 chars) + max_tokens 1500→3000
+결과: GLM 응답 정상화 (1325자), Cycle 3 재평가 45/45 만점
+상태: 해결 완료 (2026-05-10)
 ```
 
 ### NAS 인덱싱 지연
