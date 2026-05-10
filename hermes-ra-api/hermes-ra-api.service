@@ -1,0 +1,14 @@
+[Unit]
+Description=Hermes RA Analysis API Server
+After=network.target ollama.service
+
+[Service]
+Type=simple
+User=raspi5p
+EnvironmentFile=/opt/hermes/.env
+ExecStart=/usr/bin/python3 /opt/hermes/ra_api_server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

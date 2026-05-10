@@ -1,0 +1,55 @@
+default: codex_cli
+
+models:
+  # ---------- Codex track (ChatGPT Pro - hnabyz Codex login) ----------
+  - match: "gpt-5*"
+    track: codex_cli
+    upstream_model: "{model}"
+
+  - match: "o3*"
+    track: codex_cli
+    upstream_model: "{model}"
+
+  - match: "gpt-4*"
+    track: codex_cli
+    upstream_model: "{model}"
+
+  # ---------- Copilot track (GitHub Copilot Pro - holee9) ----------
+  - match: "claude-sonnet-*"
+    track: copilot_cli
+    upstream_model: "claude-sonnet-4"
+
+  - match: "claude-*"
+    track: copilot_cli
+    upstream_model: "{model}"
+
+  - match: "gemini-*"
+    track: copilot_cli
+    upstream_model: "{model}"
+
+  - match: "copilot-*"
+    track: copilot_cli
+    upstream_model: "{model}"
+
+  # ---------- GLM track (Zhipu AI / z.ai) ----------
+  - match: "glm-*"
+    track: glm_zai
+    upstream_model: "{model}"
+
+  - match: "zhipu-*"
+    track: glm_zai
+    upstream_model: "{model}"
+
+tracks:
+  codex_cli:
+    bin: "/home/raspi5p/.hermes/node/bin/codex"
+    timeout: 120
+    skip_git_repo_check: true
+
+  copilot_cli:
+    bin: "/home/raspi5p/.hermes/node/bin/copilot"
+    timeout: 60
+
+  glm_zai:
+    api: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    timeout: 300

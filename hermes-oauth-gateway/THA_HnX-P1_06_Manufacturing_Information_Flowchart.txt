@@ -1,0 +1,17 @@
+Manufacturing Information — HnX-P1
+
+Include a manufacturing flowchart showing major process steps, controls, and acceptance checks.
+Provide both a graphical flowchart (PDF/PNG) and a textual flow:
+
+1. Incoming materials inspection (component incoming QC) -> OK? -> Yes: release to production; No: quarantine/rework
+2. Subassembly manufacturing (generator assembly, detector assembly)
+3. Subassembly testing and functional verification
+4. Final assembly
+5. Final electrical and radiation performance testing (safety tests per IEC 60601 series, output measurement)
+6. Firmware installation and configuration
+7. Final acceptance testing (IQ/OQ/PQ as applicable)
+8. Packaging and labeling (include traceability data, serial number record)
+9. Final inspection and release (QA approval)
+10. Storage and shipment
+
+Include process owner names/roles, inspection acceptance criteria, frequency of in-process checks, and key equipment used. Attach supplier list and key drawings. Provide revision control and change management procedure references.

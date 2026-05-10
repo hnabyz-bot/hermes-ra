@@ -1,0 +1,75 @@
+{
+  "id": "abyz-hermes-notify-v1",
+  "name": "Hermes Notify → Email",
+  "description": "Hermes Agent가 이메일 발송이 필요할 때 호출하는 webhook. 기존 SMTP 크리덴셜 재사용.",
+  "active": true,
+  "nodes": [
+    {
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hermes-notify",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "hermes-notify"
+    },
+    {
+      "id": "parse-node",
+      "name": "Parse Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst data = raw.body ?? raw;\n\nconst to      = String(data.to      ?? 'drake.lee@abyzr.com').trim();\nconst subject = String(data.subject ?? '[Hermes] 알림').trim();\nconst body    = String(data.body    ?? '').trim();\nconst from    = String(data.from    ?? 'hnabyz2023@gmail.com').trim();\n\nif (!body) throw new Error('body 필드가 비어 있습니다');\n\nreturn [{ json: { to, subject, body, from } }];"
+      }
+    },
+    {
+      "id": "send-email-node",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "fromEmail": "={{ $json.from }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "2s8YQmWpdtZIP6nb",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "id": "respond-node",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"to\": \"{{ $('Parse Payload').item.json.to }}\", \"subject\": \"{{ $('Parse Payload').item.json.subject }}\" }"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Parse Payload", "type": "main", "index": 0 }]]
+    },
+    "Parse Payload": {
+      "main": [[{ "node": "Send Email", "type": "main", "index": 0 }]]
+    },
+    "Send Email": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+Executive Summary & Device Description — HnX-P1
+
+Device name: HnX-P1 (Portable X‑ray system)
+Model: HnX-P1
+Manufacturer: [Manufacturer name, address]
+
+Updated Intended Use (as requested):
+"The portable x-ray system may be used for diagnostic imaging of body extremities.
+- Not for mammography use
+- This device is not intended to replace a stationary radiographic system"
+
+Indications for use: diagnostic imaging of limbs/extremities in clinical and outpatient settings. Summary of main components: x-ray generator, detector (specify type), control console, shielding and accessories.
+
+Include: technical specifications (kV range, mA, focal spot, exposure time ranges), physical dimensions, weight, power supply, radiation protection features, and list of accessories and optional configurations.
