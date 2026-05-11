@@ -1,3 +1,9 @@
+> ⚠️ **[LEGACY — rpi5p 아카이브]**
+> 이 문서는 rpi5p에서 운영하던 자체 개발 Hermes v5 RAG 파이프라인 설계 spec이다.
+> T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며,
+> 이 설계의 `gemma3:4b + GLM cascade`, `Qdrant Docker`, `nas_indexer.py`는
+> 더 이상 활성 개발 대상이 아니다. 레퍼런스 목적으로만 보존.
+
 # Hermes v5 — RA 도메인 지식 에이전트 설계 spec
 
 **날짜**: 2026-05-07  

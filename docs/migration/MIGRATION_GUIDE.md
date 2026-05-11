@@ -1,3 +1,8 @@
+> ⚠️ **[LEGACY — rpi5p 아카이브]**
+> 이 문서는 rpi5p 기반 Hermes 자체 개발 파이프라인(ra_api_server.py + Qdrant + Ollama)의 PC 이전 절차다.
+> T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며,
+> 이 이전 가이드는 더 이상 활성 운영 대상이 아니다. 레퍼런스 목적으로만 보존.
+
 # Hermes RA — 신규 PC 이전 가이드
 
 **버전**: v5.2  

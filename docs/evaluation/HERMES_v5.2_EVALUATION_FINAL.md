@@ -1,3 +1,8 @@
+> ⚠️ **[LEGACY — rpi5p 아카이브]**
+> 이 문서는 rpi5p 기반 Hermes 자체 개발 파이프라인(OAuth Gateway + 3-Model Architecture)의 평가 기록이다.
+> T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며,
+> 이 평가 결과는 더 이상 현재 시스템과 무관하다. 레퍼런스 목적으로만 보존.
+
 # Hermes v5.2 모델 평가 최종 보고서
 
 **작성일**: 2026-05-10  

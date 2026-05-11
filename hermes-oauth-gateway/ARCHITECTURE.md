@@ -1,3 +1,8 @@
+> ⚠️ **[LEGACY — rpi5p 아카이브]**
+> 이 문서는 rpi5p 기반 Hermes OAuth Gateway (포트 5055)의 아키텍처 설계 기록이다.
+> T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며,
+> OAuth Gateway는 더 이상 T3610에서 운영하지 않는다. 레퍼런스 목적으로만 보존.
+
 # Hermes OAuth Gateway — 아키텍처 상세 설계
 
 **Document Version**: 1.0  

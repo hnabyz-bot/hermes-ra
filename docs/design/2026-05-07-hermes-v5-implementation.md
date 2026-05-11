@@ -1,5 +1,11 @@
 # Hermes v5 Implementation Plan
 
+> ⚠️ **[LEGACY — rpi5p 아카이브]**
+> 이 문서는 rpi5p에서 운영하던 자체 개발 Hermes v5 파이프라인의 구현 계획서다.
+> T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며,
+> 이 계획서의 `ra_api_server.py`, `gemma3:4b`, `GLM cascade`, `nas_indexer.py` 구현은
+> 더 이상 활성 개발 대상이 아니다. 레퍼런스 목적으로만 보존.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Upgrade Hermes RA agent to v5: NAS document RAG via Qdrant, attachment text extraction, 3-stage model cascade, and n8n workflow v4 with OP comment posting.

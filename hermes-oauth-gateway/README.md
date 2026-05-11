@@ -1,3 +1,8 @@
+> ⚠️ **[LEGACY — rpi5p 아카이브]**
+> 이 컴포넌트는 rpi5p 기반 Hermes 자체 개발 파이프라인의 LLM 게이트웨이다.
+> T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며,
+> 이 게이트웨이는 더 이상 T3610에서 사용하지 않는다. 레퍼런스 목적으로만 보존.
+
 # Hermes OAuth Gateway
 
 **OpenAI-compatible API gateway for Hermes Agent and n8n**  

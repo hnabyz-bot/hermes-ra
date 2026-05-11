@@ -3,13 +3,48 @@
 [![Latest Release](https://img.shields.io/github/v/release/hnabyz-bot/hermes-ra)](https://github.com/hnabyz-bot/hermes-ra/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Hermes RA**는 의료기기 규제 대응(Regulatory Affairs)을 자동화하는 AI 에이전트입니다.
+> **[2026-05-11 아키텍처 전환]**
+> T3610 서버에서의 AI 엔진은 **Nous Research Hermes Agent v0.13.0** 으로 전환되었습니다.
+> 기존 `ra_api_server.py` + `3-Model Architecture (gemma3:4b → GLM cascade)` + `hermes-oauth-gateway`는
+> **rpi5p 서버 아카이브**입니다. 신규 개발은 Hermes Agent RA 전문 스킬 탑재 방식으로 진행합니다.
 
-- 📧 **이메일 기반 분석**: 규제 메일 → 자동 분석 → OpenProject 댓글 등록
-- 🧠 **3-Model 아키텍처**: Codex (GPT-4o) + Copilot (Claude Sonnet 4.5) + GLM (glm-4.5-air)
-- 🔍 **NAS RAG 통합**: 회사 내 규제 자료 기반 맞춤형 대응 (84,592 포인트)
-- ⚡ **n8n 오케스트레이션**: 워크플로우 기반 완전 자동화
-- 🔄 **이전 완전 자동화**: 스냅샷 기반 신규 PC 이전 지원
+**Hermes RA**는 의료기기 규제 대응(Regulatory Affairs)을 AI 전문가 수준으로 수행하는 에이전트입니다.
+
+---
+
+## T3610 현재 시스템 (Nous Research Hermes Agent v0.13.0)
+
+| 항목 | 내용 |
+|------|------|
+| AI 엔진 | Nous Research Hermes Agent v0.13.0 |
+| 바이너리 | `~/.local/bin/hermes` |
+| 설정 | `~/.hermes/config.yaml` |
+| RA 스킬 경로 | `~/.hermes/skills/ra-expert/` |
+| 지식베이스 | ra-project + MD-process (매일 07:00 자동 pull) |
+| NAS RAG | nas_ra_docs 컬렉션 (84,592 points) via MCP |
+| gx10 연결 | 2.5G 직결 (192.168.100.200 → 192.168.100.1), 실측 2.35Gbps |
+| gx10 Ollama | http://gx10:11434 (2.5G 직결) / http://100.78.1.7:11434 (Tailscale 외부) |
+
+```
+[RA 메일 / 규제 질의]
+         ↓
+[Hermes Agent v0.13.0 (Nous Research)]
+    ├── RA Expert Skills (MFDS · FDA · MDR · ISO)
+    ├── NAS Qdrant MCP (nas_ra_docs, 84,592 points)
+    ├── ra-project 지식베이스
+    └── MD-process SOP
+         ↓
+[전문가급 RA 답변 + 출처 문서 명시]
+```
+
+상세 개발 지침: **[CLAUDE.md](CLAUDE.md)** | 운영 철학: **[HERMES_RA_PHILOSOPHY.md](HERMES_RA_PHILOSOPHY.md)**
+
+---
+
+## [LEGACY] rpi5p 아카이브
+
+> 아래 내용은 rpi5p 서버에서 운영하던 자체 개발 파이프라인의 기록이다.
+> T3610에서는 사용하지 않는다.
 
 ## 📦 프로젝트 구조
 
@@ -361,6 +396,6 @@ sudo bash ops/scripts/setup_new_pc.sh --reindex
 
 ---
 
-**Last Updated**: 2026-05-18  
-**Version**: v5.2 (hermes-agent 기반)  
-**Status**: Production
+**Last Updated**: 2026-05-21  
+**T3610 AI 엔진**: Nous Research Hermes Agent v0.13.0  
+**Status**: Active Development (RA Expert Skill 탑재 진행 중)
