@@ -1,0 +1,17 @@
+[Unit]
+Description=Hermes GitHub Repo Indexer Server
+After=network.target
+
+[Service]
+Type=simple
+User=raspi5p
+ExecStart=/usr/bin/python3 /opt/hermes/index_github_repos.py --server
+WorkingDirectory=/opt/hermes
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hermes-github-indexer
+
+[Install]
+WantedBy=multi-user.target

@@ -40,11 +40,12 @@ hermes-ra/
 │       └── ra_analyze.py        # 단일 메일 분석
 │
 ├── config/                      # 설정 파일
-│   ├── systemd/                 # systemd 서비스
-│   │   ├── hermes-ra-api.service
-│   │   ├── hermes-oauth-gateway.service
-│   │   ├── hermes-indexer.service
-│   │   └── hermes-nas-scanner.service
+│   ├── systemd/                 # systemd 서비스 (참고용 — 현재 /etc/systemd/system/ 기준)
+│   │   ├── hermes-gateway.service       # NousResearch Hermes-Agent gateway (:8642)
+│   │   ├── hermes-api-server.service    # RA 분석 API (:8643)
+│   │   ├── raspi-ra-oauth-gateway.service
+│   │   ├── raspi-ra-indexer.service
+│   │   └── raspi-ra-nas-scanner.service
 │   ├── nas/
 │   │   ├── fstab.example        # NAS fstab 항목 템플릿
 │   │   └── nas-ra.creds.example # CIFS 자격증명 템플릿
@@ -82,30 +83,29 @@ sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/res
 
 ### 수동 설치
 
-#### 1. hermes-oauth-gateway
+#### 1. raspi-ra-oauth-gateway
 
 ```bash
 cd hermes-oauth-gateway
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-sudo cp config/systemd/hermes-oauth-gateway.service /etc/systemd/system/
-sudo systemctl enable --now hermes-oauth-gateway
+sudo cp config/systemd/raspi-ra-oauth-gateway.service /etc/systemd/system/
+sudo systemctl enable --now raspi-ra-oauth-gateway
 
 curl http://localhost:5055/health
 ```
 
-#### 2. RA API 서버
+#### 2. RA API 서버 (NousResearch Hermes-Agent 기반)
 
 ```bash
-sudo cp ops/scripts/ra_api_server.py /opt/hermes/
-sudo cp ops/scripts/nas_indexer.py /opt/hermes/
-sudo cp ops/scripts/nas_scanner.py /opt/hermes/
+# hermes-agent 바이너리 설치 후 (v0.13.0+)
+sudo cp config/systemd/hermes-gateway.service /etc/systemd/system/
+sudo cp config/systemd/hermes-api-server.service /etc/systemd/system/
+sudo systemctl enable --now hermes-gateway
+sudo systemctl enable --now hermes-api-server
 
-sudo cp config/systemd/hermes-ra-api.service /etc/systemd/system/
-sudo systemctl enable --now hermes-ra-api
-
-curl http://localhost:7788/health
+curl http://localhost:8643/health
 ```
 
 #### 3. NAS 마운트
@@ -198,28 +198,30 @@ conn.close()
 ### 주요 서비스
 
 ```bash
-# API 서버 (포트 7788)
-sudo systemctl status hermes-ra-api
+# NousResearch Hermes-Agent gateway (:8642)
+sudo systemctl status hermes-gateway
 
-# OAuth 게이트웨이 (포트 5055)
-sudo systemctl status hermes-oauth-gateway
+# RA 분석 API 서버 (:8643)
+sudo systemctl status hermes-api-server
 
-# NAS 인덱싱 (매일 02:00)
-sudo systemctl status hermes-indexer
+# OAuth 게이트웨이 (:5055) — Codex/Copilot/GLM 3-model
+sudo systemctl status raspi-ra-oauth-gateway
 
-# NAS 변경 감지 (백그라운드)
-sudo systemctl status hermes-nas-scanner
+# RA 지식베이스 인덱싱
+sudo systemctl status raspi-ra-indexer
+
+# NAS 변경 감지
+sudo systemctl status raspi-ra-nas-scanner
 ```
 
 ### 로그 확인
 
 ```bash
-# API 로그
-tail -f /home/raspi5p/.hermes/logs/agent.log
+# API 서버 로그
+sudo journalctl -u hermes-api-server -f
 
-# systemd 로그
-sudo journalctl -u hermes-ra-api -f
-sudo journalctl -u hermes-oauth-gateway -f
+# OAuth 게이트웨이 로그
+sudo journalctl -u raspi-ra-oauth-gateway -f
 ```
 
 ### NAS 인덱싱
@@ -256,21 +258,20 @@ for c in resp['result']['collections']:
       ↓
   [n8n WF ra-request-to-op_v5 (FhOhE3GPgepI6KOB)]
       ↓
-[Hermes RA API :7788]
-  ├─ 메일 파싱
-  ├─ 첨부파일 추출
+[hermes-api-server :8643 /analyze]   ← NousResearch Hermes-Agent 기반
+  ├─ 메일 파싱 + 첨부파일 추출
   ├─ NAS RAG 검색 (Qdrant :6333, nas_ra_docs)
   │     ↑ /mnt/nas-ra/ (CIFS, 100.126.59.10)
-  └─ 3-Model 병렬 호출
-       ├─ [OAuth Gateway :5055]
-       │   ├─ Codex (GPT-4o)
-       │   ├─ Copilot (Claude Sonnet 4.5)
-       │   └─ GLM (glm-4.5-air)
-       └─ 결과 통합
+  └─ hermes-gateway :8642 (hermes -z oneshot)
            ↓
       [wp_comment 생성]
            ↓
     [OpenProject 댓글]
+
+[raspi-ra-oauth-gateway :5055]  ← 3-model 평가용 (별도)
+  ├─ Codex (GPT-4o via OpenRouter)
+  ├─ Copilot (Claude Sonnet 4.5 via CLI OAuth)
+  └─ GLM (glm-4.5-air via z.ai)
 ```
 
 ## 🔄 신규 PC 이전
@@ -360,6 +361,6 @@ sudo bash ops/scripts/setup_new_pc.sh --reindex
 
 ---
 
-**Last Updated**: 2026-05-10  
-**Version**: v5.2  
+**Last Updated**: 2026-05-18  
+**Version**: v5.2 (hermes-agent 기반)  
 **Status**: Production

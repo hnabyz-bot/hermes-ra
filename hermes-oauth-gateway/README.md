@@ -104,7 +104,7 @@ Config: routes.yaml (모델 → track 라우팅)
 ```bash
 cd /home/raspi5p/workspace/n8n-stack
 git clone https://github.com/hnabyz-bot/abyz-lab-pm.git  # 또는 기존 경로 사용
-cd hermes-oauth-gateway
+cd raspi-ra-oauth-gateway
 ```
 
 **2. Python 가상환경 설정**
@@ -133,13 +133,13 @@ pip install -r requirements.txt
 
 **4. systemd 서비스 등록**
 ```bash
-sudo cp hermes-oauth-gateway.service /etc/systemd/system/
+sudo cp raspi-ra-oauth-gateway.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable hermes-oauth-gateway
-sudo systemctl start hermes-oauth-gateway
+sudo systemctl enable raspi-ra-oauth-gateway
+sudo systemctl start raspi-ra-oauth-gateway
 
 # 확인
-sudo systemctl status hermes-oauth-gateway
+sudo systemctl status raspi-ra-oauth-gateway
 ```
 
 **5. 헬스 체크**
@@ -201,7 +201,7 @@ tracks:
 
 **모델 추가 방법:**
 1. routes.yaml에 새 `match` 규칙 추가
-2. Gateway 재시작: `sudo systemctl restart hermes-oauth-gateway`
+2. Gateway 재시작: `sudo systemctl restart raspi-ra-oauth-gateway`
 3. `/v1/models` 엔드포인트에서 자동 노출
 
 ### API 키 관리
@@ -297,13 +297,13 @@ curl -s http://localhost:5055/v1/models \
       "id": "gpt-5-latest",
       "object": "model",
       "created": 0,
-      "owned_by": "hermes-oauth-gateway"
+      "owned_by": "raspi-ra-oauth-gateway"
     },
     {
       "id": "claude-sonnet-4",
       "object": "model",
       "created": 0,
-      "owned_by": "hermes-oauth-gateway"
+      "owned_by": "raspi-ra-oauth-gateway"
     }
   ]
 }
@@ -379,24 +379,24 @@ docker exec n8n-stack-n8n-1 wget -qO- \
 
 **실시간 로그:**
 ```bash
-journalctl -u hermes-oauth-gateway -f --no-pager
+journalctl -u raspi-ra-oauth-gateway -f --no-pager
 ```
 
 **최근 로그:**
 ```bash
-journalctl -u hermes-oauth-gateway -n 100
+journalctl -u raspi-ra-oauth-gateway -n 100
 ```
 
 **에러만 필터:**
 ```bash
-journalctl -u hermes-oauth-gateway -p err
+journalctl -u raspi-ra-oauth-gateway -p err
 ```
 
 ### 세션 통계
 
 **Track별 요청 수:**
 ```bash
-sqlite3 /home/raspi5p/workspace/n8n-stack/hermes-oauth-gateway/sessions.db << 'EOF'
+sqlite3 /home/raspi5p/workspace/n8n-stack/raspi-ra-oauth-gateway/sessions.db << 'EOF'
 SELECT
   track,
   COUNT(*) as requests,
@@ -412,7 +412,7 @@ EOF
 
 **API 키별 통계:**
 ```bash
-sqlite3 /home/raspi5p/workspace/n8n-stack/hermes-oauth-gateway/sessions.db << 'EOF'
+sqlite3 /home/raspi5p/workspace/n8n-stack/raspi-ra-oauth-gateway/sessions.db << 'EOF'
 SELECT
   api_key,
   COUNT(*) as requests,
@@ -428,23 +428,23 @@ EOF
 
 **상태 확인:**
 ```bash
-systemctl status hermes-oauth-gateway
+systemctl status raspi-ra-oauth-gateway
 ```
 
 **재시작:**
 ```bash
-sudo systemctl restart hermes-oauth-gateway
+sudo systemctl restart raspi-ra-oauth-gateway
 ```
 
 **활성화/비활성화:**
 ```bash
-sudo systemctl enable hermes-oauth-gateway   # 부팅 시 자동 시작
-sudo systemctl disable hermes-oauth-gateway  # 자동 시작 해제
+sudo systemctl enable raspi-ra-oauth-gateway   # 부팅 시 자동 시작
+sudo systemctl disable raspi-ra-oauth-gateway  # 자동 시작 해제
 ```
 
 **로그 저장:**
 ```bash
-journalctl -u hermes-oauth-gateway -p err > /tmp/gateway-errors.log
+journalctl -u raspi-ra-oauth-gateway -p err > /tmp/gateway-errors.log
 ```
 
 ---
@@ -457,15 +457,15 @@ journalctl -u hermes-oauth-gateway -p err > /tmp/gateway-errors.log
 
 **진단:**
 ```bash
-systemctl status hermes-oauth-gateway
-journalctl -u hermes-oauth-gateway -n 50 --no-pager
+systemctl status raspi-ra-oauth-gateway
+journalctl -u raspi-ra-oauth-gateway -n 50 --no-pager
 netstat -tlnp 2>/dev/null | grep 5055
 ```
 
 **해결:**
 ```bash
 # 서비스 재시작
-sudo systemctl restart hermes-oauth-gateway
+sudo systemctl restart raspi-ra-oauth-gateway
 
 # 포트 점유 확인 및 해제
 sudo lsof -i :5055
@@ -502,7 +502,7 @@ tracks:
 
 재시작:
 ```bash
-sudo systemctl restart hermes-oauth-gateway
+sudo systemctl restart raspi-ra-oauth-gateway
 ```
 
 ### OAuth 토큰 만료
@@ -528,7 +528,7 @@ gh auth switch holee9
 
 재시작:
 ```bash
-sudo systemctl restart hermes-oauth-gateway
+sudo systemctl restart raspi-ra-oauth-gateway
 ```
 
 ### n8n에서 "Cannot resolve host"
@@ -540,7 +540,7 @@ sudo systemctl restart hermes-oauth-gateway
 **해결:**
 ```bash
 # 1. gateway 서비스 확인
-systemctl is-active hermes-oauth-gateway
+systemctl is-active raspi-ra-oauth-gateway
 
 # 2. docker-compose.yml에 extra_hosts 확인
 grep -A 5 "extra_hosts" /home/raspi5p/workspace/n8n-stack/docker-compose.yml
@@ -562,7 +562,7 @@ docker exec n8n-stack-n8n-1 wget -qO- http://host.docker.internal:5055/health
 # Python 모듈 사용
 python3 << 'EOF'
 import sqlite3
-conn = sqlite3.connect('/home/raspi5p/workspace/n8n-stack/hermes-oauth-gateway/sessions.db')
+conn = sqlite3.connect('/home/raspi5p/workspace/n8n-stack/raspi-ra-oauth-gateway/sessions.db')
 cursor = conn.cursor()
 cursor.execute('SELECT track, COUNT(*) FROM requests GROUP BY track;')
 for row in cursor:
@@ -597,14 +597,14 @@ EOF
 ## 파일 구조
 
 ```
-hermes-oauth-gateway/
+raspi-ra-oauth-gateway/
 ├── gateway.py                 # FastAPI 메인 애플리케이션
 ├── codex_driver.py            # Codex CLI subprocess 관리
 ├── copilot_driver.py          # Copilot CLI subprocess 관리 (Track B)
 ├── session_store.py           # SQLite 세션 로깅
 ├── routes.yaml                # 모델 라우팅 규칙
 ├── requirements.txt           # Python 의존성
-├── hermes-oauth-gateway.service  # systemd unit file
+├── raspi-ra-oauth-gateway.service  # systemd unit file
 ├── sessions.db                # SQLite 데이터베이스 (자동 생성)
 ├── venv/                      # Python 가상환경
 ├── README.md                  # 이 문서

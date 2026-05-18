@@ -7,16 +7,17 @@ Hermes RA Agent는 의료기기 규제 인허가(RA) 업무를 RA 전문가 수�
 
 ## 핵심 파일
 
-- `/opt/hermes/ra_api_server.py` — 프로덕션 API 서버 (포트 7788)
-- `/opt/hermes/.env` — GLM API 키 등 환경변수
-- `systemctl status hermes-ra-api` — 서비스 상태 확인
+- `openproject-stack/scripts/hermes/hermes-api-server.py` — 프로덕션 API 서버 (포트 8643)
+- `~/.hermes/.env` — API 키 환경변수
+- `systemctl status hermes-api-server` — RA 분석 API 상태
+- `systemctl status hermes-gateway` — NousResearch Hermes-Agent 상태
 
 ## Definition of Done (DoD) — 모든 이슈에 적용
 
 이슈를 완료로 처리하려면 아래 **전부** 충족해야 한다:
 
-1. **실제 코드 변경**: `/opt/hermes/ra_api_server.py` 또는 n8n 워크플로우에 변경 반영
-2. **서비스 재시작**: `systemctl restart hermes-ra-api` 완료
+1. **실제 코드 변경**: `hermes-api-server.py` 또는 n8n 워크플로우에 변경 반영
+2. **서비스 재시작**: `systemctl restart hermes-api-server` 완료
 3. **E2E 검증**: 메일 → Hermes → OpenProject WP + 댓글 전체 파이프라인 동작 확인
 
 ### DoD 위반 사례 (완료 아님)
@@ -28,24 +29,26 @@ Hermes RA Agent는 의료기기 규제 인허가(RA) 업무를 RA 전문가 수�
 ## 서비스 구조
 
 ```
-[RA 메일] → Gmail → n8n (ra-request-to-op) → /analyze :7788
+[RA 메일] → Gmail → n8n (ra-request-to-op_v5) → /analyze :8643
                                                     ↓
-                              NAS Qdrant (nas_ra_docs) ← 84,592 points
+                              hermes-gateway :8642 (hermes -z oneshot)
                                                     ↓
-                              OAuth Gateway :5055
-                              ├── Codex (GPT-4o)
-                              ├── Copilot (Claude Sonnet)
-                              └── GLM-4.5-Air
+                              NAS Qdrant (nas_ra_docs)
                                                     ↓
                               OpenProject WP + 댓글 자동 등록
+
+[raspi-ra-oauth-gateway :5055] — 3-model 평가 전용
+  ├── Codex (GPT-4o via OpenRouter)
+  ├── Copilot (Claude Sonnet via CLI OAuth)
+  └── GLM-4.5-Air (z.ai)
 ```
 
 ## 모델 혼동 금지
 
-| 역할 | 모델 | 포트 |
-|------|------|------|
-| 내부 캐스케이드 | gemma3:4b → glm-4.5-air → glm-5.1 | 자동 |
-| 외부 평가 | Codex(gpt-4o) / Copilot(claude-sonnet) / GLM(glm-4.5-air) | :5055 |
+| 역할 | 서비스 | 포트 |
+|------|--------|------|
+| RA 분석 (운영) | hermes-api-server + hermes-gateway | :8643 / :8642 |
+| 3-model 평가 | raspi-ra-oauth-gateway | :5055 |
 
 ## 개발 원칙
 
