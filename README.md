@@ -41,6 +41,141 @@
 
 ---
 
+## T3610 ↔ GX10 인프라 (2026-05-21 구성 완료)
+
+### 노드 구성
+
+| 노드 | 호스트명 | 역할 | OS |
+|------|----------|------|-----|
+| **T3610** | abyz-lab-Precision-T3610 | Hermes RA 메인 서버 / Claude Code | Ubuntu 26.04 LTS |
+| **GX10** | gx10-d74b | AI 컴퓨팅 노드 (Ollama, n8n, Portainer) | Ubuntu 24.04.4 LTS (nvidia) |
+
+### 네트워크 토폴로지
+
+```
+[T3610]                                    [스위치]                   [GX10]
+enp6s0 (2.5G)                                                   enx00e04c4728ca (2.5G)
+192.168.100.200/24 ──────── 2500 Mbps Full Duplex ──────────── 192.168.100.1/24
+
+enp0s25 (1G)                                                    enP7s7 (1G)
+10.20.6.140/24 ───────────────── LAN ──────────────────────── 10.20.6.141/24
+
+tailscale0                                                       tailscale0
+100.119.79.28 ───────────── Tailscale VPN ─────────────────── 100.78.1.7
+```
+
+#### 인터페이스 상세
+
+**T3610**
+
+| 인터페이스 | 속도 | IP | 용도 |
+|-----------|------|-----|------|
+| `enp6s0` | 2.5G | 192.168.100.200/24 (고정) | GX10 전용 직결 |
+| `enp0s25` | 1G | 10.20.6.140/20 (DHCP) | 인터넷/사내 LAN (기본 게이트웨이) |
+| `tailscale0` | — | 100.119.79.28 | 원격 접속 VPN |
+
+**GX10**
+
+| 인터페이스 | 속도 | IP | 용도 |
+|-----------|------|-----|------|
+| `enx00e04c4728ca` | 2.5G | 192.168.100.1/24 (고정) | T3610 전용 직결 |
+| `enP7s7` | 1G | 10.20.6.141/20 (DHCP) | 인터넷/사내 LAN (기본 게이트웨이) |
+| `tailscale0` | — | 100.78.1.7 | 원격 접속 VPN |
+
+#### 2.5G 링크 우선순위 정책
+
+GX10과의 모든 통신은 **2.5G 직결(192.168.100.x)이 최우선**입니다.
+
+- Tailscale(100.78.1.7) 및 사내 LAN(10.20.6.141)보다 항상 우선
+- 상호 tailscale IP도 2.5G 경유 static route 설정:
+  - T3610 → GX10 tailscale: `100.78.1.7/32 via 192.168.100.1 dev enp6s0`
+  - GX10 → T3610 tailscale: `100.119.79.28/32 via 192.168.100.200 dev enx00e04c4728ca`
+
+#### 성능 측정 결과 (2026-05-21)
+
+| 항목 | 수치 |
+|------|------|
+| TCP 송신 (T3610 → GX10) | **2.36 Gbps** (패킷 손실 0%) |
+| TCP 수신 (GX10 → T3610) | **2.35 Gbps** (패킷 손실 0%) |
+| UDP | 1.68 Gbps (손실 0.21%) |
+| 평균 지연 | **0.89 ms** |
+| 링크 활용률 | 94% (2.5G 대비) |
+
+### GX10 서비스 목록
+
+| 포트 | 서비스 | 용도 |
+|------|--------|------|
+| 22 | SSH | 원격 관리 |
+| 11434 | **Ollama** | 로컬 LLM 추론 (Hermes RA 로컬 모델) |
+| 8080 | HTTP | 웹 서비스 |
+| 5678 | **n8n** | 워크플로우 자동화 (RA 메일 처리) |
+| 9000 | Portainer | 컨테이너 관리 |
+
+### SSH 접속
+
+```bash
+# GX10 접속 — 2.5G 직결 (최우선, ~/.ssh/config 자동 적용)
+ssh gx10                     # → 192.168.100.1 via 192.168.100.200 (2.5G)
+
+# GX10 접속 — Tailscale fallback (2.5G 링크 불가 시)
+ssh gx10-tail                # → gx10-d74b (tailscale)
+
+# T3610에서 GX10 Ollama 접근
+curl http://192.168.100.1:11434/api/tags    # 2.5G 직결 경유
+```
+
+`~/.ssh/config` 핵심 설정:
+
+```
+Host gx10
+    HostName 192.168.100.1
+    User holee
+    BindAddress 192.168.100.200      # 반드시 2.5G 인터페이스 사용
+    IdentityFile ~/.ssh/id_ed25519
+
+Host 10.20.6.141                     # LAN IP 입력 시 자동 2.5G 리다이렉트
+    HostName 192.168.100.1
+    User holee
+    BindAddress 192.168.100.200
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+### NetworkManager 설정 (재부팅 영속)
+
+netplan YAML 위치: `/etc/netplan/90-NM-d511308b-06c2-3cc4-b7da-8fb9d11b069b.yaml`
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    NM-d511308b-06c2-3cc4-b7da-8fb9d11b069b:
+      renderer: NetworkManager
+      match:
+        name: "enp6s0"
+        macaddress: "88:c9:b3:be:56:a5"
+      addresses:
+      - "192.168.100.200/24"
+      routes:
+      - to: "100.78.1.7/32"        # GX10 tailscale IP도 2.5G 경유
+        via: "192.168.100.1"
+      networkmanager:
+        name: "gx10-2.5G"
+        passthrough:
+          connection.autoconnect-priority: "100"
+          ipv4.never-default: "true"   # 인터넷 기본 게이트웨이로 사용 안 함
+          ipv6.method: "disabled"
+```
+
+### 보안 설정
+
+| 항목 | T3610 | GX10 |
+|------|-------|------|
+| UFW | 활성 (22, 3389, enp6s0 전체, tailscale0 전체) | 활성 (22, 11434, 8080, 5678, 9000, 5201) |
+| PermitRootLogin | no (`/etc/ssh/sshd_config.d/99-security.conf`) | no (sshd_config 직접) |
+| `/etc/hosts` | `192.168.100.1 gx10` | `192.168.100.200 t3610` |
+
+---
+
 ## [LEGACY] rpi5p 아카이브
 
 > 아래 내용은 rpi5p 서버에서 운영하던 자체 개발 파이프라인의 기록이다.
@@ -252,11 +387,11 @@ sudo systemctl status raspi-ra-nas-scanner
 ### 로그 확인
 
 ```bash
-# API 서버 로그
-sudo journalctl -u hermes-api-server -f
+# Hermes Agent 로그 (T3610)
+tail -f /home/abyz-lab/.hermes/logs/agent.log
 
-# OAuth 게이트웨이 로그
-sudo journalctl -u raspi-ra-oauth-gateway -f
+# systemd 로그
+sudo journalctl -u hermes -f
 ```
 
 ### NAS 인덱싱
@@ -398,4 +533,5 @@ sudo bash ops/scripts/setup_new_pc.sh --reindex
 
 **Last Updated**: 2026-05-21  
 **T3610 AI 엔진**: Nous Research Hermes Agent v0.13.0  
-**Status**: Active Development (RA Expert Skill 탑재 진행 중)
+**Status**: Active Development (RA Expert Skill 탑재 진행 중)  
+**인프라**: T3610 ↔ GX10 2.5G 직결 구성 완료 (2026-05-21)
