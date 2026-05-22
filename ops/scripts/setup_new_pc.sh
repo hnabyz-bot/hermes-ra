@@ -32,9 +32,14 @@ echo "[1/8] 시스템 패키지 설치..."
 apt-get update -q
 apt-get install -y -q python3 python3-pip python3-venv poppler-utils cifs-utils curl
 
-# 2. Python 패키지
+# 2. Python 패키지 (hermes venv 사용)
 echo "[2/8] Python 패키지 설치..."
-pip3 install -q flask requests python-docx python-pptx openpyxl psycopg2-binary
+HERMES_PIP="$HERMES_HOME/.hermes/hermes-agent/venv/bin/pip3"
+if [ -f "$HERMES_PIP" ]; then
+    sudo -u "$HERMES_USER" "$HERMES_PIP" install -q flask requests python-docx python-pptx openpyxl psycopg2-binary
+else
+    pip3 install -q --break-system-packages flask requests python-docx python-pptx openpyxl psycopg2-binary
+fi
 
 # 3. /opt/hermes-ra/ 디렉터리 및 인프라 스크립트 배포
 echo "[3/8] 인프라 스크립트 배포 ($HERMES_RA_DIR)..."
@@ -116,6 +121,7 @@ echo "[6/8] NAS 마운트 설정..."
 NAS_MOUNT="/mnt/nas-ra"
 NAS_CREDS="/etc/samba/nas-ra.creds"
 mkdir -p "$NAS_MOUNT"
+mkdir -p /etc/samba
 
 if [ ! -f "$NAS_CREDS" ]; then
     if [ -f "$REPO_ROOT/config/nas/nas-ra.creds.example" ]; then
