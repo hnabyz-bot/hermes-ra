@@ -102,8 +102,13 @@ def chat_completions():
     data = request.get_json(force=True, silent=True) or {}
     messages = data.get("messages", [])
 
+    # n8n sends {from, subject, body, attachments} without messages field
     if not messages:
-        return jsonify({"error": "No messages provided"}), 400
+        body_content = data.get("body", data.get("content", ""))
+        if body_content:
+            messages = [{"role": "user", "content": body_content}]
+        else:
+            return jsonify({"error": "No messages provided"}), 400
 
     metadata = extract_metadata(data)
     prompt = build_ra_prompt(messages, metadata)
