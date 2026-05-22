@@ -26,7 +26,8 @@
 | T3610 | Hermes RA 메인 서버 | 192.168.100.200 | 10.20.6.140 | 100.119.79.28 |
 | GX10 | AI 컴퓨팅 노드 | 192.168.100.1 | 10.20.6.141 | 100.78.1.7 |
 
-GX10은 Ollama `:11434`, n8n `:5678`, Portainer `:9000`을 담당한다. GX10과의 통신은 2.5G 직결망을 우선한다.
+GX10은 Ollama `:11434`, Portainer `:9000`을 담당한다. GX10과의 통신은 2.5G 직결망을 우선한다.
+n8n과 OpenProject는 **rpi5p**에서 운영된다.
 
 ## 2. 저장소 파일 분류
 
@@ -152,7 +153,7 @@ API_SERVER_PORT=8643
 | hermes-api-server | 8643 | T3610 |
 | Qdrant | 6333 | T3610 |
 | Ollama | 11434 | GX10 또는 T3610 |
-| n8n | 5678 | GX10 |
+| n8n | 5678 | rpi5p |
 | Portainer | 9000 | GX10 |
 | OpenProject | 443 | plm.abyz-lab.work |
 

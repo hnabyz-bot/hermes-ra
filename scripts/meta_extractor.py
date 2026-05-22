@@ -15,9 +15,9 @@ from typing import Dict, List, Optional, Tuple
 # 설정
 # =========================================================================
 
-ONTOLOGY_FILE = "/tmp/ra_ontology_design.json"
-CODEX_GATEWAY = "http://localhost:5055/v1/chat/completions"
-CODEX_AUTH = "Bearer sk-hermes-n8n"
+ONTOLOGY_FILE = os.environ.get("ONTOLOGY_FILE", "/opt/hermes/ra_ontology.json")
+CODEX_GATEWAY = os.environ.get("CODEX_GATEWAY_URL", "")
+CODEX_AUTH = "Bearer " + os.environ.get("CODEX_GATEWAY_KEY", "sk-hermes-n8n")
 
 # 온톨로지 로드
 with open(ONTOLOGY_FILE, "r", encoding="utf-8") as f:
@@ -256,8 +256,10 @@ def extract_file_metadata(filepath: str) -> Dict:
 def call_codex_for_sample_analysis(filepath: str, category_id: str, sample_text: str) -> Optional[Dict]:
     """
     주요 문서 샘플을 Codex로 분석하여 메타데이터 추출
-    (선택: 시간이 오래 걸리므로 중요 문서만 사용)
+    (선택: CODEX_GATEWAY_URL 환경변수 미설정 시 skip)
     """
+    if not CODEX_GATEWAY:
+        return None
     category = CATEGORY_CATALOG.get(category_id, {})
     category_name = category.get("name", "Document")
 

@@ -30,8 +30,8 @@ except ImportError:
 # 설정
 # =========================================================================
 
-QDRANT_URL = "http://localhost:6333"
-OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
+QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
+OLLAMA_EMBED_URL = os.environ.get("OLLAMA_URL", "http://192.168.100.1:11434") + "/api/embeddings"
 COLLECTION = "nas_ra_docs"
 STATE_DB = "/opt/hermes/indexer_state.db"
 LOG_FILE = "/var/log/nas_indexer.log"

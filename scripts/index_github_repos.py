@@ -25,8 +25,8 @@ import requests
 
 REPOS = ["holee9/MD-process", "holee9/ra-project"]
 GITHUB_TOKEN: Optional[str] = os.environ.get("GITHUB_TOKEN")
-QDRANT_URL = "http://localhost:6333"
-OLLAMA_URL = "http://localhost:11434"
+QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.100.1:11434")
 COLLECTION = "hermes-ra-knowledge"
 EMBED_MODEL = "nomic-embed-text"
 STATE_FILE = "/tmp/github_index_state.json"

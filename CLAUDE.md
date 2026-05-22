@@ -162,7 +162,9 @@ API_SERVER_KEY=<secret>            # hermes-api-server.py Bearer 인증
 | T3610 | 192.168.100.200 | 10.20.6.140 | 100.119.79.28 |
 | GX10 | 192.168.100.1 | 10.20.6.141 | 100.78.1.7 |
 
-GX10 서비스: Ollama (:11434), n8n (:5678), Portainer (:9000)
+GX10 서비스: Ollama (:11434), Portainer (:9000)
+
+rpi5p 서비스: n8n (:5678), OpenProject (plm.abyz-lab.work)
 
 **GX10 통신 우선순위**: 2.5G 직결(192.168.100.x) > Tailscale > LAN
 

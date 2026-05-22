@@ -4,8 +4,8 @@ import os, sqlite3, json, subprocess, hashlib, urllib.request, sys, time
 from pathlib import Path
 from datetime import datetime
 
-QDRANT_URL = "http://localhost:6333"
-OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
+QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
+OLLAMA_EMBED_URL = os.environ.get("OLLAMA_URL", "http://192.168.100.1:11434") + "/api/embeddings"
 COLLECTION = "nas_ra_docs"
 STATE_DB = "/opt/hermes/indexer_state.db"
 CHUNK_CHARS = 800    # ~500 tokens

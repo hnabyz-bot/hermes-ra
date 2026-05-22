@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, json, re, urllib.request
+import os, sys, json, re, urllib.request
 
 def analyze(from_addr, subject, body, attachments=''):
     attach_section = ('\n\n[첨부파일]\n' + attachments) if attachments else ''
@@ -7,7 +7,8 @@ def analyze(from_addr, subject, body, attachments=''):
     
     req_data = json.dumps({'model': 'gemma3:4b', 'prompt': prompt, 'stream': False, 'options': {'temperature': 0.1, 'num_predict': 400}}).encode('utf-8')
     try:
-        req = urllib.request.Request('http://localhost:11434/api/generate', data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
+        ollama_url = os.environ.get("OLLAMA_URL", "http://192.168.100.1:11434")
+        req = urllib.request.Request(f'{ollama_url}/api/generate', data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
         with urllib.request.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read().decode('utf-8'))
             raw = result.get('response', '').replace('```json', '').replace('```', '').strip()

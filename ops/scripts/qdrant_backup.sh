@@ -39,8 +39,8 @@ print(f'[backup] 저장: {out}')
     echo "[backup] $COL 완료: $BACKUP_DIR/$COL.snapshot"
 done
 
-# indexer_state.db도 함께 복사
-DB_SRC="/home/raspi5p/workspace/n8n-stack/hermes-ra/indexer_state.db"
+# indexer_state.db도 함께 복사 (STATE_DB 환경변수 또는 기본값 사용)
+DB_SRC="${STATE_DB:-/opt/hermes/indexer_state.db}"
 if [ -f "$DB_SRC" ]; then
     cp "$DB_SRC" "$BACKUP_DIR/indexer_state.db"
     echo "[backup] indexer_state.db 복사 완료"

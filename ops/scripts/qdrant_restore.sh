@@ -9,7 +9,7 @@ QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 BACKUP_DIR="${1:-}"
 REINDEX="${2:-}"
 COLLECTIONS=("nas_ra_docs" "hermes-ra-knowledge")
-STATE_DB="/home/raspi5p/workspace/n8n-stack/hermes-ra/indexer_state.db"
+STATE_DB="${STATE_DB_PATH:-/opt/hermes/indexer_state.db}"
 
 # Qdrant 응답 대기
 wait_qdrant() {

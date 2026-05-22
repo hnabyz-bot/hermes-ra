@@ -23,11 +23,11 @@ SCAN_EXTENSIONS = {".xlsx", ".pptx", ".pdf", ".docx"}
 SKIP_PREFIX = ("~$", ".")
 
 DB_CONFIG = {
-    "host": "172.18.0.3",
-    "port": 5432,
-    "dbname": "n8n",
-    "user": "n8n",
-    "password": "***REDACTED***"
+    "host": os.environ.get("N8N_DB_HOST", "localhost"),
+    "port": int(os.environ.get("N8N_DB_PORT", "5432")),
+    "dbname": os.environ.get("N8N_DB_NAME", "n8n"),
+    "user": os.environ.get("N8N_DB_USER", "n8n"),
+    "password": os.environ.get("N8N_DB_PASSWORD", ""),
 }
 
 # OP WP 매핑 (파일명 키워드 → WP ID)
