@@ -1,9 +1,136 @@
-> ⚠️ **[LEGACY — rpi5p 아카이브]**
-> 이 문서는 rpi5p 기반 Hermes 자체 개발 파이프라인(ra_api_server.py + Qdrant + Ollama)의 PC 이전 절차다.
-> T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며,
-> 이 이전 가이드는 더 이상 활성 운영 대상이 아니다. 레퍼런스 목적으로만 보존.
-
 # Hermes RA — 신규 PC 이전 가이드
+
+---
+
+## T3610 신규 PC 이전 가이드 (Nous Research Hermes Agent v0.13.0)
+
+**최종 업데이트**: 2026-05-22
+
+### 전제 조건
+
+1. **Nous Research Hermes Agent v0.13.0** 설치 (`~/.local/bin/hermes`)
+2. **hermes-ra 저장소** 클론: `git clone https://github.com/hnabyz-bot/hermes-ra.git`
+3. **root 또는 sudo 권한** (systemd 서비스 등록용)
+
+### 방법 A: Qdrant 스냅샷 이전 (권장 — 수 시간 절감)
+
+**Step 1 — 기존 PC(T3610/rpi5p)에서 백업**
+
+```bash
+# hermes-ra 레포 최신 상태 확인
+cd ~/workspace/hermes-ra
+git pull
+
+# Qdrant 스냅샷 생성 (nas_ra_docs + hermes-ra-knowledge 컬렉션)
+bash ops/scripts/qdrant_backup.sh ~/.hermes/snapshots/backup_$(date +%Y%m%d)
+# → ~/.hermes/snapshots/backup_YYYYMMDD/ 생성
+```
+
+**Step 2 — 신규 PC로 스냅샷 복사**
+
+```bash
+# 기존 PC에서:
+rsync -avz ~/.hermes/snapshots/backup_YYYYMMDD/ NEW_PC_IP:~/.hermes/snapshots/restore/
+
+# 또는 외부 스토리지 경유:
+cp -r ~/.hermes/snapshots/backup_YYYYMMDD/ /external/drive/
+```
+
+**Step 3 — 신규 PC에서 설정**
+
+```bash
+# 신규 PC에서 레포 클론
+git clone https://github.com/hnabyz-bot/hermes-ra.git ~/workspace/hermes-ra
+cd ~/workspace/hermes-ra
+
+# 자동 셋업 (스냅샷 복원 포함)
+sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/restore/
+```
+
+**Step 4 — 환경변수 및 서비스 시작**
+
+```bash
+# 환경 변수 파일 작성
+nano /opt/hermes-ra/.env
+
+# 필수 키:
+# GLM_API_KEY=sk_xxxxx              # z.ai API 키
+# OPENPROJECT_API_KEY=xxxxx
+# OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
+# QDRANT_URL=http://localhost:6333
+# OLLAMA_URL=http://192.168.100.1:11434  # GX10 2.5G 직결
+# API_SERVER_KEY=<secret>
+# HERMES_BIN=~/.local/bin/hermes
+# HERMES_RA_DIR=/opt/hermes-ra
+# NAS_RA_PATH=/mnt/nas-ra/공통자료/RA
+
+# NAS 자격증명 설정
+sudo nano /etc/samba/nas-ra.creds
+# username=drake.lee
+# password=YOUR_PASSWORD
+
+# NAS 마운트 확인 및 마운트
+ls /mnt/nas-ra/ 2>/dev/null || sudo mount /mnt/nas-ra/
+
+# 서비스 시작
+sudo systemctl enable --now hermes-gateway hermes-api-server
+
+# 헬스체크
+curl http://localhost:8642/health
+curl http://localhost:8643/health
+```
+
+**Step 5 — 동작 검증**
+
+```bash
+# Qdrant 컬렉션 상태 확인
+python3 -c "
+import urllib.request, json
+resp = json.loads(urllib.request.urlopen('http://localhost:6333/collections').read())
+for c in resp['result']['collections']:
+    info = json.loads(urllib.request.urlopen(f'http://localhost:6333/collections/{c[\"name\"]}').read())
+    print(c['name'], info['result'].get('points_count','?'), 'points')
+"
+# 기대값: nas_ra_docs: 84,592+ points
+
+# RA Expert Skill 동작 테스트
+hermes -z "MFDS 의료기기 소프트웨어 허가 요건"
+# → 전문가 수준 답변 + 출처 문서 확인
+```
+
+---
+
+### 방법 B: NAS 재인덱싱 (스냅샷 없을 때)
+
+스냅샷이 없는 경우, NAS에서 처음부터 재인덱싱합니다. **수 시간 소요**.
+
+```bash
+# 신규 PC에서
+cd ~/workspace/hermes-ra
+sudo bash ops/scripts/setup_new_pc.sh --reindex
+
+# 진행 상황 확인
+tail -f ~/.hermes/logs/agent.log
+```
+
+완료 후:
+```bash
+# NAS 컬렉션 포인트 수 확인
+python3 -c "
+import urllib.request, json
+resp = json.loads(urllib.request.urlopen('http://localhost:6333/collections/nas_ra_docs').read())
+print('nas_ra_docs:', resp['result'].get('points_count','?'), 'points')
+"
+```
+
+---
+
+## [LEGACY — rpi5p 아카이브]
+
+아래는 rpi5p 기반 Hermes 자체 개발 파이프라인(ra_api_server.py + Qdrant + Ollama)의 PC 이전 절차입니다.  
+T3610 서버에서는 **Nous Research Hermes Agent v0.13.0**을 사용하며, 이 이전 가이드는 더 이상 활성 운영 대상이 아닙니다. 레퍼런스 목적으로만 보존합니다.
+
+### 버전 정보
 
 **버전**: v5.2  
 **최종 업데이트**: 2026-05-10

@@ -23,19 +23,57 @@ Hermes는 이 업무의 **지식 처리 전체**를 담당한다.
 
 ## 2. 시스템 구조 (How)
 
-### T3610 현재 구조 (Nous Research Hermes Agent 기반)
+### T3610 현재 구조 (Nous Research Hermes Agent v0.13.0 기반)
+
+**핵심 변화:** rpi5p의 자체 개발 파이프라인(ra_api_server.py 3-모델 캐스케이드)에서  
+**Nous Research Hermes Agent v0.13.0** 스킬 시스템으로 마이그레이션 완료 (2026-05-11)
 
 ```
-[RA 메일 / 사내 규제 질의]
+[Gmail 수신]
+    → n8n ra-request-to-op_v5 (rpi5p:5678, 1분 주기 폴링)
+    → hermes-api-server :8643 (/opt/hermes-ra/hermes-api-server.py)
+         메일 메타데이터 파싱 (제목, 발신자, 첨부파일)
+         리치 컨텍스트 빌드
          ↓
-[Hermes Agent v0.13.0 (Nous Research)]
-    ├── RA Expert Skills (MFDS · FDA · MDR · ISO 표준)
-    ├── NAS Qdrant MCP 연동 (nas_ra_docs, 84,592 points)
-    ├── ra-project 지식베이스 (매일 07:00 자동 pull)
-    └── MD-process SOP (매일 07:00 자동 pull)
+    → Nous Research Hermes Agent v0.13.0 (hermes -z)
+         ~/.hermes/skills/ra-expert/ (이 저장소의 skills/ra-expert/ → symlink)
+         ├── SKILL.md  (MFDS · CE MDR · FDA 510(k) · IEC 표준)
+         ├── scripts/rag_search.py
+         └── references/ (3개 시장 규정 요약)
          ↓
-[전문가급 RA 답변 + 근거 문서 출처 명시]
+         NAS Qdrant :6333 RAG 검색
+         ├── nas_ra_docs 컬렉션 (84,592 points)
+         ├── 임베딩: nomic-embed-text (GX10 Ollama :11434)
+         └── 데이터 소스: /mnt/nas-ra/공통자료/RA (CIFS, 매일 02:00 자동 인덱싱)
+         ↓
+         ra-project 지식베이스 (매일 07:00 자동 pull)
+         MD-process SOP (매일 07:00 자동 pull)
+         ↓
+         wp_comment JSON 응답 생성
+         ├── 분석 결과 (근거 문서 출처 명시)
+         ├── 체크리스트 (조치사항)
+         └── 규제 요건 매핑
+         ↓
+    → hermes-gateway :8642 (응답 중계)
+    → n8n (응답 수신)
+    → OpenProject 프로젝트 96 WP 댓글 자동 등록
+         ↓
+    [RA 담당자]
+         → Hermes 분석 검토 (5분)
+         → 최종 판단 + 서명
+         → 체크리스트 기반 조치
 ```
+
+**인프라 분리 원칙:**
+
+| 계층 | 경로 | 역할 |
+|------|------|------|
+| **인텔리전스** | `~/.hermes/skills/ra-expert/` | **WHO**: RA 전문가 역할 정의, 지식, 판단 기준 (MFDS/CE/FDA/ISO) |
+| **데이터 플로우** | `/opt/hermes-ra/` | **HOW**: NAS 인덱싱, HTTP 브리지, 임베딩 파이프라인 |
+
+- 스킬 수정 후 Hermes 재시작 불필요 (파일 기반 로드)
+- `/opt/hermes-ra/` 는 인프라 전용 (이 저장소는 지식만 관리)
+- `~/.hermes/skills/ra-expert/` ← `hermes-ra/skills/ra-expert/` 심링크 (setup_new_pc.sh 생성)
 
 ### rpi5p 레거시 구조 (아카이브 — 더 이상 T3610에서 사용 안 함)
 
