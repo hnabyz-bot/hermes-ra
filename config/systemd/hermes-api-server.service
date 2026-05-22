@@ -9,7 +9,7 @@ User=raspi5p
 WorkingDirectory=/home/raspi5p/.hermes
 EnvironmentFile=/home/raspi5p/.hermes/.env
 Environment=HERMES_BIN=/home/raspi5p/.local/bin/hermes
-Environment=API_SERVER_PORT=8642
+Environment=API_SERVER_PORT=8643
 ExecStart=/home/raspi5p/.hermes/hermes-agent/venv/bin/python3 /home/raspi5p/workspace/openproject-stack/scripts/hermes/hermes-api-server.py
 Restart=on-failure
 RestartSec=5

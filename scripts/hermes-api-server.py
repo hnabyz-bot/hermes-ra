@@ -4,7 +4,7 @@ hermes-api-server.py — hermes oneshot HTTP 래퍼 서버
 OpenAI /v1/chat/completions 호환 엔드포인트를 제공하며,
 내부적으로 `hermes -z "..."` 를 실행해 응답을 반환합니다.
 
-포트: 8642 (0.0.0.0 — Docker/n8n 컨테이너에서 172.17.0.1:8642 로 접근 가능)
+포트: 8643 (0.0.0.0 — Docker/n8n 컨테이너에서 172.17.0.1:8643 로 접근 가능)
 인증: Authorization: Bearer <API_SERVER_KEY>
 """
 
@@ -17,8 +17,8 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 API_KEY = os.environ.get("API_SERVER_KEY", "")
-HERMES_BIN = os.environ.get("HERMES_BIN", "/home/raspi5p/.local/bin/hermes")
-PORT = int(os.environ.get("API_SERVER_PORT", "8642"))
+HERMES_BIN = os.environ.get("HERMES_BIN", "/home/abyz-lab/.local/bin/hermes")
+PORT = int(os.environ.get("API_SERVER_PORT", "8643"))
 TIMEOUT = int(os.environ.get("HERMES_TIMEOUT", "120"))
 
 
