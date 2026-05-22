@@ -1,8 +1,22 @@
 #!/usr/bin/env python3
 """Hermes NAS Indexer v1 — crawl NAS docs, embed, upsert to Qdrant nas_ra_docs"""
-import os, sqlite3, json, subprocess, hashlib, urllib.request, sys, time
+import os, sqlite3, json, subprocess, hashlib, urllib.request, sys, time, signal
 from pathlib import Path
 from datetime import datetime
+from contextlib import contextmanager
+
+FILE_EXTRACT_TIMEOUT = 30  # seconds per file
+
+@contextmanager
+def time_limit(seconds):
+    def handler(signum, frame):
+        raise TimeoutError(f"extract timed out after {seconds}s")
+    signal.signal(signal.SIGALRM, handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 OLLAMA_EMBED_URL = os.environ.get("OLLAMA_URL", "http://192.168.100.1:11434") + "/api/embeddings"
@@ -67,45 +81,46 @@ def save_file_state(conn, path, mtime, size, qdrant_ids):
 def extract_text(filepath):
     ext = Path(filepath).suffix.lower()
     try:
-        if ext == ".pdf":
-            r = subprocess.run(["pdftotext", "-q", filepath, "-"],
-                               capture_output=True, text=True, timeout=60)
-            return r.stdout
-        elif ext == ".docx":
-            import docx
-            doc = docx.Document(filepath)
-            return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-        elif ext == ".pptx":
-            from pptx import Presentation
-            prs = Presentation(filepath)
-            parts = []
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if hasattr(shape, "text") and shape.text.strip():
-                        parts.append(shape.text)
-            return "\n".join(parts)
-        elif ext == ".xlsx":
-            import openpyxl
-            wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
-            parts = []
-            for sn in wb.sheetnames:
-                ws = wb[sn]
-                parts.append(f"[{sn}]")
-                for row in ws.iter_rows(values_only=True):
-                    cells = [str(c) for c in row if c is not None and str(c).strip()]
-                    if cells:
-                        parts.append(" | ".join(cells))
-            wb.close()
-            return "\n".join(parts)
-        elif ext in (".doc",):
-            r = subprocess.run(
-                ["libreoffice", "--headless", "--convert-to", "txt", "--outdir", "/tmp", filepath],
-                capture_output=True, timeout=120
-            )
-            txt = f"/tmp/{Path(filepath).stem}.txt"
-            if os.path.exists(txt):
-                with open(txt) as f:
-                    return f.read()
+        with time_limit(FILE_EXTRACT_TIMEOUT):
+            if ext == ".pdf":
+                r = subprocess.run(["pdftotext", "-q", filepath, "-"],
+                                   capture_output=True, text=True, timeout=25)
+                return r.stdout
+            elif ext == ".docx":
+                import docx
+                doc = docx.Document(filepath)
+                return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            elif ext == ".pptx":
+                from pptx import Presentation
+                prs = Presentation(filepath)
+                parts = []
+                for slide in prs.slides:
+                    for shape in slide.shapes:
+                        if hasattr(shape, "text") and shape.text.strip():
+                            parts.append(shape.text)
+                return "\n".join(parts)
+            elif ext == ".xlsx":
+                import openpyxl
+                wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+                parts = []
+                for sn in wb.sheetnames:
+                    ws = wb[sn]
+                    parts.append(f"[{sn}]")
+                    for row in ws.iter_rows(values_only=True):
+                        cells = [str(c) for c in row if c is not None and str(c).strip()]
+                        if cells:
+                            parts.append(" | ".join(cells))
+                wb.close()
+                return "\n".join(parts)
+            elif ext in (".doc",):
+                r = subprocess.run(
+                    ["libreoffice", "--headless", "--convert-to", "txt", "--outdir", "/tmp", filepath],
+                    capture_output=True, timeout=25
+                )
+                txt = f"/tmp/{Path(filepath).stem}.txt"
+                if os.path.exists(txt):
+                    with open(txt) as f:
+                        return f.read()
     except Exception as e:
         print(f"  [extract error] {Path(filepath).name}: {e}", file=sys.stderr)
     return ""
@@ -126,7 +141,8 @@ def chunk_text(text):
 
 
 def embed(text):
-    data = json.dumps({"model": "nomic-embed-text", "prompt": text}).encode()
+    model = os.environ.get("EMBED_MODEL", "qwen3-embedding:latest")
+    data = json.dumps({"model": model, "prompt": text}).encode()
     req = urllib.request.Request(OLLAMA_EMBED_URL, data=data,
                                   headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=60) as resp:
