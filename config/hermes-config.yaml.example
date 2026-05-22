@@ -219,16 +219,16 @@ mcp_servers:
     args:
     - -y
     - '@modelcontextprotocol/server-filesystem'
-    - /home/raspi5p/workspace/openproject-stack
+    - /home/abyz-lab/work/workspace-github/hnabyz-bot/hermes-ra
     - /mnt/nas-ra
     command: npx
   openproject:
     args:
-    - /home/raspi5p/workspace/openproject-stack/scripts/hermes/openproject_mcp.py
+    - /home/abyz-lab/work/workspace-github/holee9/openproject-stack/scripts/hermes/openproject_mcp.py
     command: python3
     env:
       OP_API_KEY: ${OP_API_KEY}
-      OP_BASE_URL: http://localhost:8086
+      OP_BASE_URL: https://plm.abyz-lab.work
 memory:
   flush_min_turns: 6
   memory_char_limit: 2200
