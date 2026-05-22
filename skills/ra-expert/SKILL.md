@@ -37,20 +37,58 @@ This skill activates for:
 
 ---
 
-## RAG Search Protocol
+## Knowledge Sources
 
-Before answering any substantive RA question, you MUST search the NAS document database:
+Three complementary knowledge layers — use all applicable sources before answering:
+
+### Layer 1: NAS RAG (Company-Specific Documents)
+
+Original company documents indexed in Qdrant. Use for: certificates, DHF files, product-specific test reports, past regulatory submissions, audit records.
 
 ```bash
 python skills/ra-expert/scripts/rag_search.py "<search_query>" --top 5
 ```
 
-Use multiple searches with different query angles:
-- Korean query for MFDS documents: `"소프트웨어 의료기기 허가 요건"`
-- English query for CE/FDA: `"IEC 60601-1 test requirements"`
+Query angles:
+- Korean for MFDS: `"소프트웨어 의료기기 허가 요건"`
+- English for CE/FDA: `"IEC 60601-1 test requirements"`
 - Product-specific: `"[product name] technical file"`
 
-Include the search results as `source_docs` in your wp_comment response. If Qdrant is unreachable, note it and answer from reference documents only.
+If Qdrant is unreachable, note it and continue with Layers 2–3.
+
+### Layer 2: ra-project (Curated Regulatory Knowledge Base)
+
+Structured markdown KB covering MFDS/CE MDR/FDA regulatory requirements.
+Path: `/home/abyz-lab/work/workspace-github/holee9/ra-project/`
+
+Key directories:
+- `01_규제지식베이스/` — regulatory requirements by market
+- `02_제품별_기술파일/` — product-specific technical file guides
+- `03_진행현안/` — ongoing regulatory issues
+- `04_기술문서_템플릿/` — document templates
+- `06_심사_QA이력/` — regulatory review Q&A history
+
+Use MCP filesystem to search: read relevant markdown files for authoritative regulatory text.
+
+### Layer 3: MD-process (QMS / SOP Knowledge Base)
+
+Manufacturing quality management system and SOP procedures.
+Path: `/home/abyz-lab/work/workspace-github/holee9/MD-process/`
+
+Key directories:
+- `02_품질경영시스템_QMS/` — ISO 13485 QMS
+- `03_설계_개발관리/` — design control procedures
+- `07_위험관리_ISO14971/` — risk management
+- `08_시판후_감시_PMS/` — post-market surveillance
+
+Use for: QMS compliance questions, SOP references, risk management procedure citations.
+
+### Search Priority
+
+1. Query all three layers for any substantive RA question
+2. NAS RAG → cite with `filename` + `excerpt`
+3. ra-project / MD-process → cite with relative path + section heading
+4. Built-in reference docs → cite as "SKILL.md reference section"
 
 ---
 
