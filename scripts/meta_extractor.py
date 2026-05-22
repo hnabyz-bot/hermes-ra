@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 # 설정
 # =========================================================================
 
-ONTOLOGY_FILE = os.environ.get("ONTOLOGY_FILE", "/opt/hermes/ra_ontology.json")
+ONTOLOGY_FILE = os.environ.get("ONTOLOGY_FILE", "/opt/hermes-ra/ra_ontology.json")
 CODEX_GATEWAY = os.environ.get("CODEX_GATEWAY_URL", "")
 CODEX_AUTH = "Bearer " + os.environ.get("CODEX_GATEWAY_KEY", "sk-hermes-n8n")
 

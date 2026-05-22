@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-hermes-api-server.py — hermes oneshot HTTP 래퍼 서버
-OpenAI /v1/chat/completions 호환 엔드포인트를 제공하며,
-내부적으로 `hermes -z "..."` 를 실행해 응답을 반환합니다.
+hermes-api-server.py — Hermes RA OpenAI-compatible HTTP bridge
+Port: 8643 (0.0.0.0)
+Auth: Authorization: Bearer <API_SERVER_KEY>
 
-포트: 8643 (0.0.0.0 — Docker/n8n 컨테이너에서 172.17.0.1:8643 로 접근 가능)
-인증: Authorization: Bearer <API_SERVER_KEY>
+Builds a rich RA context from the incoming request metadata (subject, sender,
+attachments) before calling `hermes -z`, and wraps the response in a wp_comment
+JSON structure that n8n can post directly to OpenProject.
 """
 
-import os
 import json
+import os
+import re
 import subprocess
 import time
 from flask import Flask, request, jsonify
@@ -22,11 +24,64 @@ PORT = int(os.environ.get("API_SERVER_PORT", "8643"))
 TIMEOUT = int(os.environ.get("HERMES_TIMEOUT", "120"))
 
 
-def check_auth():
+def check_auth() -> bool:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return False
     return auth[7:] == API_KEY
+
+
+def build_ra_prompt(messages: list[dict], metadata: dict) -> str:
+    """Build a rich RA analysis prompt from messages + metadata."""
+    last_user_content = ""
+    for msg in reversed(messages):
+        if msg.get("role") == "user":
+            last_user_content = msg.get("content", "")
+            break
+
+    subject = metadata.get("subject", "")
+    sender = metadata.get("sender", "")
+    attachments = metadata.get("attachments", [])
+
+    parts = ["[RA 분석 요청]"]
+    if subject:
+        parts.append(f"제목: {subject}")
+    if sender:
+        parts.append(f"발신자: {sender}")
+    if attachments:
+        parts.append(f"첨부파일: {', '.join(attachments)}")
+    parts.append("")
+    parts.append(last_user_content)
+    parts.append("")
+    parts.append(
+        "위 내용을 분석하여 반드시 다음 JSON 형식으로만 응답하세요:\n"
+        '{"wp_comment": {"summary": "한국어 1-2문장 요약", '
+        '"market_analysis": {"mfds": null, "ce_mdr": null, "fda": null}, '
+        '"source_docs": [], "recommendation": "다음 단계 권고사항", '
+        '"confidence": "high|medium|low"}}'
+    )
+
+    return "\n".join(parts)
+
+
+def extract_metadata(data: dict) -> dict:
+    """Extract RA metadata from the request payload (set by n8n workflow)."""
+    return {
+        "subject": data.get("subject", data.get("mail_subject", "")),
+        "sender": data.get("sender", data.get("mail_sender", data.get("from", ""))),
+        "attachments": data.get("attachments", data.get("mail_attachments", [])),
+    }
+
+
+def parse_wp_comment(text: str) -> dict | None:
+    """Try to extract wp_comment JSON from hermes output."""
+    json_pattern = re.search(r'\{.*"wp_comment".*\}', text, re.DOTALL)
+    if json_pattern:
+        try:
+            return json.loads(json_pattern.group(0))
+        except json.JSONDecodeError:
+            pass
+    return None
 
 
 @app.route("/v1/models", methods=["GET"])
@@ -35,9 +90,7 @@ def list_models():
         return jsonify({"error": "Unauthorized"}), 401
     return jsonify({
         "object": "list",
-        "data": [
-            {"id": "default", "object": "model", "created": int(time.time()), "owned_by": "hermes"}
-        ]
+        "data": [{"id": "hermes-ra", "object": "model", "created": int(time.time()), "owned_by": "hermes"}],
     })
 
 
@@ -49,15 +102,11 @@ def chat_completions():
     data = request.get_json(force=True, silent=True) or {}
     messages = data.get("messages", [])
 
-    # 마지막 user 메시지를 프롬프트로 사용
-    prompt = ""
-    for msg in reversed(messages):
-        if msg.get("role") == "user":
-            prompt = msg.get("content", "")
-            break
+    if not messages:
+        return jsonify({"error": "No messages provided"}), 400
 
-    if not prompt:
-        return jsonify({"error": "No user message found"}), 400
+    metadata = extract_metadata(data)
+    prompt = build_ra_prompt(messages, metadata)
 
     try:
         result = subprocess.run(
@@ -65,37 +114,58 @@ def chat_completions():
             capture_output=True,
             text=True,
             timeout=TIMEOUT,
-            env={**os.environ, "PYTHONUNBUFFERED": "1"}
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
         response_text = result.stdout.strip()
         if not response_text and result.stderr:
-            # stderr에서 유용한 내용이 있으면 포함
             response_text = f"[hermes error] {result.stderr.strip()[:500]}"
     except subprocess.TimeoutExpired:
-        response_text = "[hermes timeout] 응답 시간 초과 (120초)"
+        response_text = json.dumps({
+            "wp_comment": {
+                "summary": "Hermes 에이전트 응답 시간 초과 (120초)",
+                "market_analysis": {"mfds": None, "ce_mdr": None, "fda": None},
+                "source_docs": [],
+                "recommendation": "서버 상태를 확인하고 재시도하세요.",
+                "confidence": "low",
+                "flags": ["timeout"],
+            }
+        })
     except Exception as e:
-        response_text = f"[hermes exception] {str(e)}"
+        response_text = json.dumps({
+            "wp_comment": {
+                "summary": f"Hermes 에이전트 오류: {str(e)[:100]}",
+                "market_analysis": {"mfds": None, "ce_mdr": None, "fda": None},
+                "source_docs": [],
+                "recommendation": "서버 로그를 확인하세요.",
+                "confidence": "low",
+                "flags": ["exception"],
+            }
+        })
+
+    # If hermes returned raw wp_comment JSON, embed it; otherwise wrap as-is
+    parsed = parse_wp_comment(response_text)
+    if parsed:
+        content = json.dumps(parsed, ensure_ascii=False)
+    else:
+        content = response_text
 
     return jsonify({
         "id": f"chatcmpl-hermes-{int(time.time())}",
         "object": "chat.completion",
         "created": int(time.time()),
-        "model": data.get("model", "default"),
+        "model": data.get("model", "hermes-ra"),
         "choices": [
             {
                 "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": response_text
-                },
-                "finish_reason": "stop"
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
             }
         ],
         "usage": {
             "prompt_tokens": len(prompt.split()),
-            "completion_tokens": len(response_text.split()),
-            "total_tokens": len(prompt.split()) + len(response_text.split())
-        }
+            "completion_tokens": len(content.split()),
+            "total_tokens": len(prompt.split()) + len(content.split()),
+        },
     })
 
 

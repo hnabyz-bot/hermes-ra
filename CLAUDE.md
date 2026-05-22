@@ -70,10 +70,10 @@ curl http://localhost:8643/health
 ls /mnt/nas-ra/ 2>/dev/null || echo "NAS 마운트 필요"
 
 # 변경 파일만 증분 인덱싱 (cron 02:00 KST 자동 실행)
-python /opt/hermes/nas_indexer.py
+python /opt/hermes-ra/nas_indexer.py
 
 # 강제 전체 재인덱싱 (신규 PC 초기화 후)
-python /opt/hermes/nas_indexer.py --force-reindex
+python /opt/hermes-ra/nas_indexer.py --force-reindex
 
 # Qdrant 컬렉션 상태 확인
 python3 -c "
@@ -103,22 +103,37 @@ sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/res
 ## 아키텍처 (T3610 현재 구조)
 
 ```
-[n8n WF: ra-request-to-op_v5 (FhOhE3GPgepI6KOB)]
+[n8n WF: ra-request-to-op_v5 (rpi5p:5678)]
+    ↓ POST http://10.20.6.140:8643/v1/chat/completions
+[hermes-api-server.py :8643]   ← /opt/hermes-ra/hermes-api-server.py
+    ├─ 메일 메타데이터 파싱 (subject, sender, attachments)
+    ├─ 리치 컨텍스트 빌드 → hermes -z "<context>"
+    └─ wp_comment JSON 구조 응답 구성
          ↓
-[hermes-api-server :8643 /analyze]   ← scripts/hermes-api-server.py
-  ├─ 메일 파싱 + 첨부파일 추출
-  ├─ NAS RAG 검색 (Qdrant :6333, nas_ra_docs, 84,592 points)
-  │     ↑ /mnt/nas-ra/ (CIFS, NAS IP: 100.126.59.10)
-  └─ hermes-gateway :8642 (hermes -z oneshot)
-           ↓
-      [OpenProject WP 댓글 생성]
+[Nous Hermes Agent v0.13.0]   ← ~/.hermes/ (바이너리: ~/.local/bin/hermes)
+    ├─ ~/.hermes/skills/ra-expert/   ← 이 저장소 skills/ra-expert/ 심링크
+    │   ├─ SKILL.md  (MFDS + CE MDR + FDA 510(k))
+    │   ├─ scripts/rag_search.py  (Qdrant 검색)
+    │   └─ references/  (규정 요약 markdown)
+    ├─ Qdrant :6333 (nas_ra_docs 84,592 points)
+    │     ↑ /mnt/nas-ra/ (CIFS, NAS IP: 100.126.59.10)
+    └─ GX10 Ollama :11434 (nomic-embed-text, 2.5G 직결)
+         ↓
+[wp_comment JSON] → n8n → OpenProject WP 댓글 등록
+
+[/opt/hermes-ra/ — 인프라 전용]
+├─ hermes-api-server.py  (HTTP bridge)
+├─ nas_indexer.py        (NAS→Qdrant, cron 02:00)
+├─ meta_extractor.py     (문서 분류)
+└─ skills/ra-expert/     (← ~/.hermes/skills/ra-expert 심링크 대상)
 ```
 
-**데이터 흐름 핵심:**
-- n8n이 Gmail을 1분 주기로 폴링 → RA 메일 감지 → `/analyze` 호출
-- `hermes-api-server.py`는 OpenAI `/v1/chat/completions` 호환 HTTP 래퍼
-- Hermes Agent가 NAS Qdrant RAG로 관련 문서 검색 후 RA 분석 수행
-- 결과를 OpenProject WP(Work Package) 댓글로 자동 등록
+**핵심 분리 원칙:**
+- `~/.hermes/skills/ra-expert/` = 에이전트 인텔리전스 (RA 전문 지식, 판단 기준)
+- `/opt/hermes-ra/` = 인프라 (NAS 인덱싱, HTTP 브리지, 임베딩 파이프라인)
+- n8n이 Gmail을 1분 주기로 폴링 → RA 메일 감지 → `hermes-api-server.py` 호출
+- Hermes Agent가 NAS Qdrant RAG 검색 + RA 전문 스킬로 분석
+- 결과를 wp_comment JSON으로 반환 → n8n이 OpenProject WP 댓글 등록
 
 ---
 
@@ -126,31 +141,38 @@ sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/res
 
 | 경로 | 역할 | 상태 |
 |------|------|------|
-| `scripts/hermes-api-server.py` | OpenAI-compat HTTP 래퍼 (:8643) | **활성** |
+| `skills/ra-expert/SKILL.md` | RA 전문 에이전트 스킬 (MFDS/CE/FDA) | **핵심** |
+| `skills/ra-expert/scripts/rag_search.py` | Qdrant NAS 문서 검색 헬퍼 | **핵심** |
+| `skills/ra-expert/references/` | 규정 요약 마크다운 (3개 시장) | **핵심** |
+| `scripts/hermes-api-server.py` | OpenAI-compat HTTP 브리지 (:8643) | **활성** |
 | `scripts/nas_indexer.py` | NAS 증분 인덱서 (cron 02:00) | **활성** |
-| `scripts/nas_scanner.py` | NAS 변경 감지 (md5 해시) | **활성** |
-| `scripts/ra_analyze.py` | 단일 메일 분석 (수동 테스트용) | **활성** |
-| `config/hermes-config.yaml.example` | Hermes 설정 템플릿 | 참고용 |
+| `scripts/nas_indexer_v2.py` | NAS 인덱서 v2 (메타데이터 통합) | 개발본 |
+| `scripts/meta_extractor.py` | 문서 메타데이터 분류 (온톨로지) | **활성** |
+| `scripts/index_ra_knowledge.py` | RA 지식베이스 인덱싱 | **활성** |
+| `scripts/index_github_repos.py` | GitHub 저장소 인덱싱 | **활성** |
 | `config/dotenv/hermes.env.example` | 환경변수 키 목록 | 참고용 |
-| `config/systemd/` | systemd 서비스 파일 (참고, 실제: `/etc/systemd/system/`) | 참고용 |
+| `config/systemd/` | systemd 서비스 파일 (실제: `/etc/systemd/system/`) | 참고용 |
 | `workflows/ra-request-to-op_v5.json` | n8n 활성 워크플로우 | **활성** |
+| `scripts/nas_scanner.py` | rpi5p n8n PostgreSQL 전용 | **LEGACY** |
+| `scripts/ra_analyze.py` | Ollama 직접 호출 (hermes -z로 대체됨) | **LEGACY** |
 | `hermes-oauth-gateway/` | rpi5p 3-model 게이트웨이 | **LEGACY** |
 | `hermes-ra-api/` | rpi5p v5.2 Triple Model | **LEGACY** |
-| `ops/scripts/` | rpi5p 운영 스크립트 | **LEGACY** |
 | `ra_api_server.py` (루트) | rpi5p Python API 서버 | **LEGACY** |
 
 ---
 
-## 환경변수 (실제 파일: `/opt/hermes/.env`)
+## 환경변수 (실제 파일: `/opt/hermes-ra/.env`)
 
 ```bash
 GLM_API_KEY=sk_xxxxx              # z.ai API 키 (GLM-4.5-air)
 OPENPROJECT_API_KEY=xxxxx
 OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 QDRANT_URL=http://localhost:6333
-OLLAMA_URL=http://localhost:11434  # 또는 http://192.168.100.1:11434 (GX10 2.5G)
+OLLAMA_URL=http://192.168.100.1:11434  # GX10 2.5G 직결 (임베딩)
 NAS_RA_PATH=/mnt/nas-ra/공통자료/RA
 API_SERVER_KEY=<secret>            # hermes-api-server.py Bearer 인증
+HERMES_BIN=/home/abyz-lab/.local/bin/hermes
+HERMES_RA_DIR=/opt/hermes-ra
 ```
 
 ---
@@ -186,8 +208,9 @@ rpi5p 서비스: n8n (:5678), OpenProject (plm.abyz-lab.work)
 
 운영 철학 전문: `HERMES_RA_PHILOSOPHY.md`
 
-- RA 스킬은 `~/.hermes/hermes-agent/skills/software-development/hermes-agent-skill-authoring/SKILL.md` 가이드 참고
-- 신규 RA 스킬 경로: `~/.hermes/skills/ra-expert/` (이 저장소가 아닌 Hermes 설치 경로에 위치)
+- RA Expert Skill: `skills/ra-expert/SKILL.md` (이 저장소) — setup_new_pc.sh가 `~/.hermes/skills/ra-expert/`로 심링크
+- 스킬 수정 후 hermes 재시작 없이 바로 반영 (파일 기반 로드)
+- 스킬 포맷 가이드: `~/.hermes/hermes-agent/skills/software-development/hermes-agent-skill-authoring/SKILL.md`
 - 지식베이스(ra-project, MD-process)는 매일 07:00 자동 pull
 
 ---

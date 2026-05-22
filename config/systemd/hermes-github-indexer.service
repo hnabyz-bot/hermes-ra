@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=abyz-lab
-ExecStart=/usr/bin/python3 /opt/hermes/index_github_repos.py --server
-WorkingDirectory=/opt/hermes
+ExecStart=/usr/bin/python3 /opt/hermes-ra/index_github_repos.py --server
+WorkingDirectory=/opt/hermes-ra
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

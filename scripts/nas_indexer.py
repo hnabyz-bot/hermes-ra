@@ -7,7 +7,7 @@ from datetime import datetime
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 OLLAMA_EMBED_URL = os.environ.get("OLLAMA_URL", "http://192.168.100.1:11434") + "/api/embeddings"
 COLLECTION = "nas_ra_docs"
-STATE_DB = "/opt/hermes/indexer_state.db"
+STATE_DB = os.environ.get("STATE_DB", "/opt/hermes-ra/indexer_state.db")
 CHUNK_CHARS = 800    # ~500 tokens
 OVERLAP_CHARS = 160  # ~100 tokens
 BATCH_SIZE = 50      # points per Qdrant upsert call

@@ -7,10 +7,10 @@ Wants=hermes-gateway.service
 Type=simple
 User=abyz-lab
 WorkingDirectory=/home/abyz-lab/.hermes
-EnvironmentFile=/opt/hermes/.env
+EnvironmentFile=/opt/hermes-ra/.env
 Environment=HERMES_BIN=/home/abyz-lab/.local/bin/hermes
 Environment=API_SERVER_PORT=8643
-ExecStart=/home/abyz-lab/.hermes/hermes-agent/venv/bin/python3 /opt/hermes/hermes-api-server.py
+ExecStart=/home/abyz-lab/.hermes/hermes-agent/venv/bin/python3 /opt/hermes-ra/hermes-api-server.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

@@ -9,7 +9,7 @@ QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 BACKUP_DIR="${1:-}"
 REINDEX="${2:-}"
 COLLECTIONS=("nas_ra_docs" "hermes-ra-knowledge")
-STATE_DB="${STATE_DB_PATH:-/opt/hermes/indexer_state.db}"
+STATE_DB="${STATE_DB_PATH:-/opt/hermes-ra/indexer_state.db}"
 
 # Qdrant 응답 대기
 wait_qdrant() {
@@ -39,7 +39,7 @@ conn.close()
 print('[restore] DB 초기화 완료')
 "
     echo "[restore] nas_indexer.py 실행..."
-    python3 /opt/hermes/nas_indexer.py
+    python3 /opt/hermes-ra/nas_indexer.py
     exit 0
 fi
 

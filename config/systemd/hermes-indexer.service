@@ -3,8 +3,8 @@ Description=Hermes RA Indexer Server
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/hermes/index_ra_knowledge.py --server
-WorkingDirectory=/opt/hermes
+ExecStart=/usr/bin/python3 /opt/hermes-ra/index_ra_knowledge.py --server
+WorkingDirectory=/opt/hermes-ra
 Restart=always
 RestartSec=5
 User=abyz-lab

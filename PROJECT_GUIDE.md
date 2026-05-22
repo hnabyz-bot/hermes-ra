@@ -12,11 +12,21 @@
 
 ```text
 [Gmail 수신]
-    -> n8n ra-request-to-op_v5, 1분 폴링
-    -> hermes-api-server :8643, scripts/hermes-api-server.py
-    -> NAS RAG 검색, Qdrant :6333, nas_ra_docs
-    -> hermes-gateway :8642, hermes -z oneshot
+    -> n8n ra-request-to-op_v5 (rpi5p:5678), 1분 폴링
+    -> hermes-api-server :8643 (/opt/hermes-ra/hermes-api-server.py)
+         메일 메타데이터 파싱 + 리치 컨텍스트 빌드
+         -> Nous Hermes Agent v0.13.0 (hermes -z)
+              ~/.hermes/skills/ra-expert/ (MFDS/CE MDR/FDA)
+              -> Qdrant :6333 nas_ra_docs RAG 검색
+              -> wp_comment JSON 생성
+    -> hermes-gateway :8642 (hermes 내부 게이트웨이)
     -> OpenProject WP 댓글 자동 등록
+
+[인프라: /opt/hermes-ra/]       [인텔리전스: ~/.hermes/skills/ra-expert/]
+  hermes-api-server.py              SKILL.md (RA 전문 지식)
+  nas_indexer.py (cron 02:00)       scripts/rag_search.py
+  meta_extractor.py                 references/*.md (규정 요약)
+  indexer_state.db
 ```
 
 ### 1.2 노드와 네트워크
@@ -35,15 +45,16 @@ n8n과 OpenProject는 **rpi5p**에서 운영된다.
 
 | 경로 | 역할 |
 |------|------|
-| `scripts/hermes-api-server.py` | OpenAI 호환 HTTP 래퍼, 기본 포트 `8643` |
+| `skills/ra-expert/SKILL.md` | RA 전문 에이전트 스킬 (MFDS/CE MDR/FDA 510(k)) |
+| `skills/ra-expert/scripts/rag_search.py` | Qdrant NAS 문서 검색 헬퍼 |
+| `skills/ra-expert/references/` | 규정 요약 마크다운 (3개 시장) |
+| `scripts/hermes-api-server.py` | OpenAI 호환 HTTP 브리지, 기본 포트 `8643` |
 | `scripts/nas_indexer.py` | NAS 증분 인덱싱, cron 02:00 KST 기준 |
-| `scripts/nas_indexer_v2.py` | NAS 인덱서 v2 개발본 |
-| `scripts/nas_scanner.py` | NAS 변경 감지 |
-| `scripts/ra_analyze.py` | 단일 RA 질의 분석 테스트 |
+| `scripts/nas_indexer_v2.py` | NAS 인덱서 v2 개발본 (메타데이터 통합) |
+| `scripts/meta_extractor.py` | 문서 메타데이터 분류 (온톨로지 기반) |
 | `scripts/index_github_repos.py` | GitHub 저장소 인덱싱 |
 | `scripts/index_ra_knowledge.py` | RA 지식베이스 인덱싱 |
 | `scripts/extract_mail_qa.py` | 메일 QA 추출 |
-| `scripts/meta_extractor.py` | 메타데이터 추출 |
 | `config/systemd/` | T3610 systemd 서비스 템플릿 |
 | `config/dotenv/` | 환경변수 예시 파일 |
 | `workflows/` | n8n 워크플로우 JSON |
@@ -55,6 +66,8 @@ n8n과 OpenProject는 **rpi5p**에서 운영된다.
 
 | 경로 | 기준 |
 |------|------|
+| `scripts/nas_scanner.py` | rpi5p n8n PostgreSQL 전용 — T3610 배포 제외 |
+| `scripts/ra_analyze.py` | Ollama 직접 호출 — `hermes -z` + RA Expert Skill로 대체됨 |
 | `hermes-oauth-gateway/` | rpi5p 3-model gateway 아카이브 |
 | `hermes-ra-api/` | rpi5p v5.2 Triple Model 아카이브 |
 | `ra_api_server.py` | 루트의 rpi5p Python API 서버 |
@@ -121,26 +134,28 @@ hermes -z "MFDS 의료기기 소프트웨어 허가 요건을 간략히 알려�
 
 ## 5. 개발 및 검증 규칙
 
-- `scripts/hermes-api-server.py` 변경 후에는 `curl http://localhost:8643/health`와 실제 `/v1/chat/completions` 호출로 확인한다.
+- `skills/ra-expert/SKILL.md` 변경 후에는 `hermes -z "MFDS 소프트웨어 의료기기 허가"` 로 응답 품질 확인한다. (재시작 불필요)
+- `scripts/hermes-api-server.py` 변경 후에는 `curl http://localhost:8643/health`와 실제 `/v1/chat/completions` 호출로 wp_comment JSON 구조 확인한다.
 - `scripts/nas_indexer.py` 변경 후에는 작은 테스트 경로로 먼저 검증한다. `--force-reindex`는 명시적으로 필요할 때만 사용한다.
-- systemd 서비스 파일은 gateway `8642`, API server `8643`, `HERMES_BIN=/home/abyz-lab/.local/bin/hermes` 기준을 유지한다.
-- RA 답변 품질 변경은 단순 실행 성공이 아니라 실제 RA 질의와 출처 문서 포함 여부로 확인한다.
-- 레거시 rpi5p 코드 수정은 별도 목적이 있을 때만 진행하고, T3610 활성 경로와 섞지 않는다.
+- systemd 서비스 파일은 `EnvironmentFile=/opt/hermes-ra/.env`, gateway `8642`, API server `8643` 기준을 유지한다.
+- RA 답변 품질은 단순 실행 성공이 아니라 실제 RA 질의 + 출처 문서 + wp_comment JSON 구조 포함 여부로 확인한다.
+- 레거시 rpi5p 코드(`nas_scanner.py`, `ra_analyze.py`) 수정은 별도 목적이 있을 때만 진행한다.
 
 ## 6. 환경변수 관리
 
-실제 환경 파일은 `/opt/hermes/.env`에 둔다. 저장소에는 예시 파일만 둔다.
+실제 환경 파일은 `/opt/hermes-ra/.env`에 둔다. 저장소에는 예시 파일만 둔다.
 
 ```bash
 GLM_API_KEY=sk_xxxxx
 OPENPROJECT_API_KEY=xxxxx
 OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 QDRANT_URL=http://localhost:6333
-OLLAMA_URL=http://localhost:11434
+OLLAMA_URL=http://192.168.100.1:11434   # GX10 2.5G 직결 (임베딩용)
 NAS_RA_PATH=/mnt/nas-ra/공통자료/RA
 API_SERVER_KEY=<secret>
 HERMES_BIN=/home/abyz-lab/.local/bin/hermes
 API_SERVER_PORT=8643
+HERMES_RA_DIR=/opt/hermes-ra
 ```
 
 `.env`, 인증서, 키, NAS credential 원본은 커밋하지 않는다. 필요한 값은 `config/dotenv/*.example`, `config/nas/*.example`로만 공유한다.
