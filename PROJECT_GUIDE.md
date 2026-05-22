@@ -1,8 +1,9 @@
 # Hermes RA 프로젝트 진행 지침서
 
-> 작성일: 2026-05-22
+> 작성일: 2026-05-22 | 최종 개정: 2026-05-22
 > 기준 저장소: [hnabyz-bot/hermes-ra](https://github.com/hnabyz-bot/hermes-ra)
 > 현재 엔진: Nous Research Hermes Agent v0.13.0 on T3610
+> 지식소스: NAS Qdrant (Docker) + ra-project + MD-process (3계층)
 
 이 문서는 작업을 시작할 때 빠르게 기준을 맞추기 위한 진행 지침서다. 상세 운영 설명은 `README.md`, Claude Code 작업 규칙은 `CLAUDE.md`, 운영 철학은 `HERMES_RA_PHILOSOPHY.md`를 우선한다.
 
@@ -16,9 +17,11 @@
     -> hermes-api-server :8643 (/opt/hermes-ra/hermes-api-server.py)
          메일 메타데이터 파싱 + 리치 컨텍스트 빌드
          -> Nous Hermes Agent v0.13.0 (hermes -z)
-              ~/.hermes/skills/ra-expert/ (MFDS/CE MDR/FDA)
-              -> Qdrant :6333 nas_ra_docs RAG 검색
-              -> wp_comment JSON 생성
+              ~/.hermes/skills/ra-expert/ (MFDS/CE MDR/FDA) — 3계층 검색 지침 포함
+              -> [Layer 1] Qdrant :6333 nas_ra_docs RAG (Docker, qwen3-embedding:latest)
+              -> [Layer 2] ra-project 규제 지식베이스 (MCP filesystem)
+              -> [Layer 3] MD-process QMS/SOP 절차서 (MCP filesystem)
+              -> wp_comment JSON 생성 (source_docs 출처 포함)
     -> hermes-gateway :8642 (hermes 내부 게이트웨이)
     -> OpenProject WP 댓글 자동 등록
 
@@ -188,12 +191,13 @@ HERMES_RA_DIR=/opt/hermes-ra
 
 ## 9. 남은 우선순위
 
-| 우선순위 | 항목 | 기준 |
-|----------|------|------|
-| P1 | `workflows/ra-request-to-op_v5.json` 확보 | n8n 활성 워크플로우를 export 해서 저장소와 맞춘다 |
-| P2 | NAS 마운트 상태 점검 | T3610에서 `/mnt/nas-ra/` 마운트 후 인덱싱을 검증한다 |
-| P3 | OpenProject 댓글 흐름 확인 | 실제 WP 댓글 생성까지 E2E로 확인한다 |
-| P4 | 레거시 코드 정리 계획 | rpi5p 아카이브를 유지, 분리, 삭제 중 하나로 결정한다 |
+| 우선순위 | 항목 | 상태 | 기준 |
+|----------|------|------|------|
+| ~~P1~~ | ~~`workflows/ra-request-to-op_v5.json` 확보~~ | ✅ 완료 | 저장소에 포함됨 |
+| ~~P2~~ | ~~NAS 마운트 + 인덱싱~~ | ✅ 완료 (2026-05-22) | Docker Qdrant + qwen3-embedding 재인덱싱 진행 중 |
+| P3 | 3계층 지식소스 E2E 검증 | 진행 중 | `hermes -z` 질의에서 3계층 출처 포함 여부 확인 |
+| P4 | OpenProject 댓글 흐름 확인 | 대기 | 실제 WP 댓글 생성까지 E2E로 확인 |
+| P5 | 레거시 코드 정리 | 대기 | rpi5p 아카이브 유지/분리/삭제 결정 |
 
 ## 10. 개발 원칙
 

@@ -41,13 +41,13 @@ Hermes는 이 업무의 **지식 처리 전체**를 담당한다.
          ├── scripts/rag_search.py
          └── references/ (3개 시장 규정 요약)
          ↓
-         NAS Qdrant :6333 RAG 검색
-         ├── nas_ra_docs 컬렉션 (84,592 points)
-         ├── 임베딩: nomic-embed-text (GX10 Ollama :11434)
-         └── 데이터 소스: /mnt/nas-ra/공통자료/RA (CIFS, 매일 02:00 자동 인덱싱)
+         [Layer 1] NAS Qdrant :6333 RAG 검색 (Docker, --restart unless-stopped)
+         ├── nas_ra_docs 컬렉션
+         ├── 임베딩: qwen3-embedding:latest (GX10 Ollama :11434, 4096dim, /api/embed)
+         └── 데이터 소스: /mnt/nas-ra/ (CIFS, 매일 02:00 자동 인덱싱)
          ↓
-         ra-project 지식베이스 (매일 07:00 자동 pull)
-         MD-process SOP (매일 07:00 자동 pull)
+         [Layer 2] ra-project 규제 지식베이스 (holee9/ra-project, 매일 07:00 pull)
+         [Layer 3] MD-process QMS/SOP 절차서 (holee9/MD-process, 매일 07:05 pull)
          ↓
          wp_comment JSON 응답 생성
          ├── 분석 결과 (근거 문서 출처 명시)
@@ -105,9 +105,9 @@ Hermes는 이 업무의 **지식 처리 전체**를 담당한다.
 
 NAS는 Hermes의 **장기 기억**이다.
 
-- `/mnt/nas-ra/공통자료/DHF (인허가)/` — 70,000+ 파일, 87GB
-- 매일 02:00 KST 자동 인덱싱 (`nas_indexer.py`)
-- Qdrant `nas_ra_docs` 컬렉션 (nomic-embed-text 임베딩, 84,592 points)
+- `/mnt/nas-ra/` (CIFS, NAS IP: 100.126.59.10) — RA 관련 선별 경로만 인덱싱
+- 매일 02:00 KST 자동 인덱싱 (`nas_indexer.py --force-reindex` or 증분)
+- Qdrant `nas_ra_docs` 컬렉션 (Docker, `qwen3-embedding:latest` 4096dim)
 - 모든 RA 분석은 NAS에서 근거 문서를 검색한 후 제시
 
 ### 온톨로지 목표
@@ -180,4 +180,5 @@ Hermes는 처리한 모든 케이스에서 학습한다:
 
 *최초 작성: 2026-05-10*
 *AI 엔진 전환 업데이트: 2026-05-11 (rpi5p 자체 파이프라인 → Nous Research Hermes Agent v0.13.0)*
+*3계층 지식소스 통합: 2026-05-22 (NAS Qdrant + ra-project + MD-process)*
 *관리: hnabyz-bot/hermes-ra 프로젝트*

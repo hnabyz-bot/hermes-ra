@@ -5,32 +5,60 @@
 
 > **[2026-05-22 T3610 운영 체제]**
 > AI 엔진: **Nous Research Hermes Agent v0.13.0**
-> T3610 서버에서 RA Expert Skill을 탑재하여 의료기기 규제 대응을 전문가 수준으로 수행합니다.
+> 3계층 지식소스(NAS Qdrant RAG + ra-project + MD-process) 통합 완료.
 > 기존 rpi5p 기반 3-Model Architecture는 아카이브입니다.
 
-**Hermes RA**는 의료기기 규제 대응(Regulatory Affairs)을 AI 전문가 수준으로 수행하는 에이전트입니다. T3610 Nous Hermes Agent v0.13.0 바탕으로 MFDS·CE MDR·FDA 3개 시장의 규제 지식을 정리한 RA Expert Skill로 구동됩니다.
+**Hermes RA**는 의료기기 규제 대응(Regulatory Affairs)을 AI 전문가 수준으로 수행하는 에이전트입니다.  
+MFDS·CE MDR·FDA 3개 시장 규제 지식과 회사 NAS 원본 문서를 결합해, 출처 문서를 명시하는 고품질 RA 분석을 제공합니다.
 
 ---
 
-## T3610 현재 시스템 (Nous Research Hermes Agent v0.13.0)
+## 현재 시스템 (2026-05-22 기준)
 
 | 항목 | 내용 |
 |------|------|
 | AI 엔진 | Nous Research Hermes Agent v0.13.0 |
 | 바이너리 | `~/.local/bin/hermes` |
 | 설정 파일 | `~/.hermes/config.yaml` |
-| RA 스킬 경로 | `~/.hermes/skills/ra-expert/` |
-| 지식베이스 | ra-project + MD-process (매일 07:00 자동 pull) |
-| NAS RAG | nas_ra_docs 컬렉션 (84,592 points via Qdrant) |
-| GX10 연결 | 2.5G 직결 (192.168.100.200 → 192.168.100.1), 실측 2.35Gbps |
-| GX10 Ollama | http://192.168.100.1:11434 (2.5G 직결) / http://100.78.1.7:11434 (Tailscale) |
+| RA 스킬 경로 | `~/.hermes/skills/ra-expert/` → `/opt/hermes-ra/skills/ra-expert/` |
+| **지식소스 Layer 1** | NAS Qdrant RAG — `nas_ra_docs` 컬렉션 (Docker, `:6333`, 재인덱싱 진행 중) |
+| **지식소스 Layer 2** | ra-project — 규제 지식베이스 (holee9/ra-project, 매일 07:00 pull) |
+| **지식소스 Layer 3** | MD-process — QMS/SOP 절차서 (holee9/MD-process, 매일 07:05 pull) |
+| 임베딩 모델 | `qwen3-embedding:latest` (GX10 Ollama, 4096차원, `/api/embed`) |
+| GX10 연결 | 2.5G 직결 (192.168.100.200 → 192.168.100.1) |
 
-### 시스템 흐름도
+---
+
+## 3계층 지식 아키텍처
 
 ```
-[규제 메일 / RA 질의]
+RA 질의
+  │
+  ├─ Layer 1: NAS Qdrant RAG
+  │    회사 원본 문서 (인증서, DHF, 성적서, 과거 인허가 이력)
+  │    → 출처 인용: filename + excerpt
+  │
+  ├─ Layer 2: ra-project 규제 지식베이스
+  │    구조화된 MFDS/CE MDR/FDA 규제 markdown
+  │    holee9/ra-project (매일 07:00 자동 pull)
+  │    → 인용: 파일 경로 + 섹션 헤딩
+  │
+  └─ Layer 3: MD-process QMS/SOP
+       ISO 13485, 설계개발관리, 위험관리, PMS 절차서
+       holee9/MD-process (매일 07:05 자동 pull)
+       → 인용: 파일 경로 + 섹션 헤딩
+```
+
+모든 RA 질의는 3계층 전체를 검색하고, wp_comment JSON의 `source_docs` 필드에 출처를 명시합니다.
+
+---
+
+## 시스템 흐름도
+
+```
+[RA 메일 / 규제 질의]
          ↓
-[n8n WF: ra-request-to-op_v5 (rpi5p:5678)]
+[n8n WF: ra-request-to-op_v5 (rpi5p:5678)]  ← Gmail 1분 주기 폴링
          ↓
 [hermes-api-server.py :8643 (T3610)]
     ├─ 메일 메타데이터 파싱 (subject, sender, attachments)
@@ -39,76 +67,122 @@
          ↓
 [Nous Hermes Agent v0.13.0 (T3610)]
     ├── RA Expert Skill (~/.hermes/skills/ra-expert/)
-    │   ├─ SKILL.md (MFDS + CE MDR 2017/745 + FDA 510(k))
-    │   ├─ scripts/rag_search.py (Qdrant NAS 검색 헬퍼)
+    │   ├─ SKILL.md (MFDS + CE MDR 2017/745 + FDA 510(k)) — 3계층 검색 지침 포함
+    │   ├─ scripts/rag_search.py (Qdrant 검색 — qwen3-embedding:latest)
     │   └─ references/ (규정 요약 마크다운)
-    ├── NAS Qdrant RAG (:6333)
-    │     ↑ /mnt/nas-ra/ (CIFS, IP: 100.126.59.10)
-    └── GX10 Ollama (:11434, 2.5G 직결 또는 Tailscale)
+    ├── [Layer 1] NAS Qdrant RAG (:6333, Docker)
+    │     ↑ /mnt/nas-ra/ (CIFS, NAS IP: 100.126.59.10)
+    │     ↑ nas_indexer.py (매일 02:00 자동 인덱싱)
+    ├── [Layer 2] ra-project (~/.hermes/config.yaml MCP filesystem)
+    │     holee9/ra-project — 규제 지식베이스
+    ├── [Layer 3] MD-process (~/.hermes/config.yaml MCP filesystem)
+    │     holee9/MD-process — QMS/SOP 절차서
+    └── GX10 Ollama (:11434, qwen3-embedding:latest)
          ↓
 [wp_comment JSON] → n8n (rpi5p) → OpenProject WP 댓글 등록
 ```
 
 ---
 
+## 자동화 스케줄
+
+| 시각 | 작업 | 로그 |
+|------|------|------|
+| 07:00 | ra-project git pull (규제 지식베이스 최신화) | `/var/log/hermes-ra-sync.log` |
+| 07:05 | MD-process git pull (QMS/SOP 최신화) | `/var/log/hermes-ra-sync.log` |
+| 07:10 | hermes-ra git pull + skills /opt/ 동기화 | `/var/log/hermes-ra-sync.log` |
+| 02:00 | NAS 증분 인덱싱 (`nas_indexer.py`) | `/var/log/hermes-nas-indexer.log` |
+
+---
+
 ## 빠른 시작
 
-### 1단계: 신규 PC 자동 셋업 (권장)
+### 1단계: 저장소 클론 및 셋업
 
 ```bash
 git clone https://github.com/hnabyz-bot/hermes-ra.git
 cd hermes-ra
 
-# Qdrant 스냅샷 복원 (기존 PC에서 사전 백업 필요)
-# 상세: docs/migration/MIGRATION_GUIDE.md
+# 신규 PC 자동 셋업 (Qdrant 스냅샷 복원)
 sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/restore/
 ```
 
-### 2단계: 환경변수 설정
+### 2단계: Qdrant 시작 (Docker)
 
 ```bash
-# /opt/hermes-ra/.env (setup_new_pc.sh 실행 후 생성됨)
+# Qdrant Docker 컨테이너 시작 (영속 스토리지 포함)
+docker run -d \
+  --name qdrant \
+  --restart unless-stopped \
+  -p 6333:6333 \
+  -v /opt/hermes-ra/qdrant_storage:/qdrant/storage \
+  qdrant/qdrant:latest
+
+# 상태 확인
+curl http://localhost:6333/collections
+```
+
+> 기존 qdrant_storage 볼륨이 없으면 빈 컨테이너로 시작됩니다.  
+> NAS 마운트 후 `python3 /opt/hermes-ra/nas_indexer.py --force-reindex` 실행.
+
+### 3단계: 환경변수 설정
+
+```bash
+# /opt/hermes-ra/.env
 nano /opt/hermes-ra/.env
 ```
 
 필수 키:
 
 ```bash
-GLM_API_KEY=sk_xxxxx                        # z.ai API 키 (GLM-4.5-air)
+GLM_API_KEY=sk_xxxxx
 OPENPROJECT_API_KEY=xxxxx
 OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 QDRANT_URL=http://localhost:6333
-OLLAMA_URL=http://192.168.100.1:11434      # GX10 2.5G 직결
+OLLAMA_URL=http://192.168.100.1:11434       # GX10 2.5G 직결 (qwen3-embedding)
 NAS_RA_PATH=/mnt/nas-ra/공통자료/RA
-API_SERVER_KEY=<secret>                     # hermes-api-server.py Bearer 인증
+API_SERVER_KEY=<secret>
 HERMES_BIN=/home/abyz-lab/.local/bin/hermes
 HERMES_RA_DIR=/opt/hermes-ra
 ```
 
 전체 키 목록: `config/dotenv/hermes.env.example`
 
-### 3단계: 서비스 시작
+### 4단계: MCP 지식소스 경로 확인
+
+`~/.hermes/config.yaml`의 MCP filesystem 섹션에 아래 경로가 포함되어야 합니다:
+
+```yaml
+mcp_servers:
+  filesystem:
+    args:
+    - -y
+    - '@modelcontextprotocol/server-filesystem'
+    - /home/abyz-lab/work/workspace-github/hnabyz-bot/hermes-ra
+    - /mnt/nas-ra
+    - /home/abyz-lab/work/workspace-github/holee9/ra-project
+    - /home/abyz-lab/work/workspace-github/holee9/MD-process
+    command: npx
+```
+
+### 5단계: 서비스 시작
 
 ```bash
-# Hermes Agent gateway 및 API 서버 활성화
 sudo systemctl enable --now hermes-gateway
 sudo systemctl enable --now hermes-api-server
 
-# 서비스 상태 확인
-sudo systemctl status hermes-gateway
-sudo systemctl status hermes-api-server
 curl http://localhost:8642/health
 curl http://localhost:8643/health
 ```
 
-### 4단계: 동작 검증
+### 6단계: 동작 검증
 
 ```bash
-# hermes -z로 RA 질의 테스트
+# RA 전문 질의 테스트 (3계층 검색 + 출처 인용 확인)
 hermes -z "MFDS 의료기기 소프트웨어 허가 요건을 알려줘"
 
-# 전체 파이프라인 E2E 테스트 (실제 RA 케이스)
-# n8n에서 테스트 메일 발송 후 OpenProject WP 댓글 생성 확인
+# RAG 검색 직접 테스트
+python3 /opt/hermes-ra/skills/ra-expert/scripts/rag_search.py "DHF 인허가" --top 3
 ```
 
 ---
@@ -118,51 +192,26 @@ hermes -z "MFDS 의료기기 소프트웨어 허가 요건을 알려줘"
 ### 서비스 관리
 
 ```bash
-# 서비스 상태 확인
-sudo systemctl status hermes-gateway
-sudo systemctl status hermes-api-server
+# 상태
+sudo systemctl status hermes-gateway hermes-api-server
 
 # 재시작
 sudo systemctl restart hermes-gateway hermes-api-server
 
-# 로그 실시간 확인
+# 로그
 sudo journalctl -u hermes-gateway -f
 sudo journalctl -u hermes-api-server -f
-
-# Hermes Agent 로그
 tail -f ~/.hermes/logs/agent.log
 ```
 
-### RA Skill 검증
+### Qdrant 관리
 
 ```bash
-# Skill 파일 위치 확인
-ls -la ~/.hermes/skills/ra-expert/
+# 컨테이너 상태
+docker ps | grep qdrant
+docker logs qdrant --tail 20
 
-# Skill 테스트 (단일 질의)
-hermes -z "MFDS 의료기기 검사 신청 절차는 어떻게 되나?"
-
-# RAG 검색 헬퍼 테스트
-python ~/.hermes/skills/ra-expert/scripts/rag_search.py \
-  --query "FDA 510(k) 클리어런스" \
-  --top-k 5
-```
-
-### NAS 인덱싱
-
-> **전제조건**: NAS가 `/mnt/nas-ra/`에 마운트되어 있어야 합니다.
-
-```bash
-# NAS 마운트 확인
-ls /mnt/nas-ra/ 2>/dev/null || echo "NAS 마운트 필요"
-
-# 변경 파일만 증분 인덱싱 (cron 02:00 KST 자동 실행)
-python /opt/hermes-ra/nas_indexer.py
-
-# 강제 전체 재인덱싱 (신규 PC 초기화 후)
-python /opt/hermes-ra/nas_indexer.py --force-reindex
-
-# Qdrant 컬렉션 상태 확인
+# 컬렉션 상태
 python3 -c "
 import urllib.request, json
 resp = json.loads(urllib.request.urlopen('http://localhost:6333/collections').read())
@@ -170,153 +219,99 @@ for c in resp['result']['collections']:
     info = json.loads(urllib.request.urlopen(f'http://localhost:6333/collections/{c[\"name\"]}').read())
     print(c['name'], info['result'].get('points_count','?'), 'points')
 "
+
+# 컨테이너 재시작 (부팅 후 자동 시작됨 --restart unless-stopped)
+docker start qdrant
+```
+
+### NAS 인덱싱
+
+```bash
+# NAS 마운트 확인
+ls /mnt/nas-ra/ 2>/dev/null || echo "NAS 마운트 필요"
+
+# 증분 인덱싱 (cron 02:00 자동 실행)
+python3 /opt/hermes-ra/nas_indexer.py
+
+# 강제 전체 재인덱싱 (신규 PC, Qdrant 교체 후)
+python3 /opt/hermes-ra/nas_indexer.py --force-reindex
+
+# 인덱싱 로그 실시간 확인
+tail -f /var/log/hermes-nas-indexer.log
+```
+
+### 지식소스 수동 동기화
+
+```bash
+# ra-project 즉시 pull
+cd /home/abyz-lab/work/workspace-github/holee9/ra-project && git pull --ff-only
+
+# MD-process 즉시 pull
+cd /home/abyz-lab/work/workspace-github/holee9/MD-process && git pull --ff-only
+
+# hermes-ra 즉시 pull + /opt/ 동기화
+cd /home/abyz-lab/work/workspace-github/hnabyz-bot/hermes-ra && git pull --ff-only
+cp skills/ra-expert/SKILL.md /opt/hermes-ra/skills/ra-expert/SKILL.md
+cp skills/ra-expert/scripts/rag_search.py /opt/hermes-ra/skills/ra-expert/scripts/rag_search.py
+
+# 동기화 로그 확인
+tail -20 /var/log/hermes-ra-sync.log
 ```
 
 ### GX10 연결 확인
 
 ```bash
-# SSH 접속 — 2.5G 직결 (최우선)
-ssh gx10                              # → 192.168.100.1 (2.5G)
+# 2.5G 직결 (최우선)
+ssh gx10                              # → 192.168.100.1
 
-# GX10 Ollama 접근
-curl http://192.168.100.1:11434/api/tags
+# Ollama 모델 목록 확인
+curl -s http://192.168.100.1:11434/api/tags | python3 -c "import sys,json; [print(m['name']) for m in json.load(sys.stdin)['models']]"
 
-# 신규 PC 전체 셋업
-sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/restore/
+# qwen3-embedding 동작 확인
+curl -s -X POST http://192.168.100.1:11434/api/embed \
+  -d '{"model":"qwen3-embedding:latest","input":"test"}' | python3 -c "import sys,json; d=json.load(sys.stdin); print('dim:', len(d['embeddings'][0]))"
 ```
 
 ---
 
-## T3610 ↔ GX10 인프라 (2026-05-21 구성 완료)
+## 인프라 구성 (T3610 ↔ GX10)
 
-### 노드 구성
+### 노드 역할
 
-| 노드 | 호스트명 | 역할 | OS |
-|------|----------|------|-----|
-| **T3610** | abyz-lab-Precision-T3610 | Hermes RA 메인 서버 / Claude Code | Ubuntu 26.04 LTS |
-| **GX10** | gx10-d74b | AI 컴퓨팅 노드 (Ollama, Portainer) | Ubuntu 24.04.4 LTS (nvidia) |
+| 노드 | 역할 | OS |
+|------|------|----|
+| **T3610** | Hermes RA 메인 서버 / Claude Code | Ubuntu 26.04 LTS |
+| **GX10** | AI 컴퓨팅 노드 (Ollama, Portainer) | Ubuntu 24.04.4 LTS (nvidia) |
+| **rpi5p** | n8n, OpenProject 운영 | — |
 
-### 네트워크 토폴로지
+### 네트워크
 
-```
-[T3610]                                    [스위치]                   [GX10]
-enp6s0 (2.5G)                                                   enx00e04c4728ca (2.5G)
-192.168.100.200/24 ──────── 2500 Mbps Full Duplex ──────────── 192.168.100.1/24
+| 노드 | 2.5G 직결 | LAN | Tailscale |
+|------|-----------|-----|-----------|
+| T3610 | 192.168.100.200 | 10.20.6.140 | 100.119.79.28 |
+| GX10 | 192.168.100.1 | 10.20.6.141 | 100.78.1.7 |
 
-enp0s25 (1G)                                                    enP7s7 (1G)
-10.20.6.140/24 ───────────────── LAN ──────────────────────── 10.20.6.141/24
+**GX10 통신 우선순위**: 2.5G 직결 > Tailscale > LAN
 
-tailscale0                                                       tailscale0
-100.119.79.28 ───────────── Tailscale VPN ─────────────────── 100.78.1.7
-```
+### 서비스 포트
 
-#### 인터페이스 상세
+| 서비스 | 포트 | 노드 |
+|--------|------|------|
+| hermes-gateway | 8642 | T3610 |
+| hermes-api-server | 8643 | T3610 |
+| Qdrant (Docker) | 6333 | T3610 |
+| Ollama | 11434 | GX10 |
+| n8n | 5678 | rpi5p |
+| Portainer | 9000 | GX10 |
+| OpenProject | 443 | plm.abyz-lab.work |
 
-**T3610**
+### 링크 성능 (2026-05-21 실측)
 
-| 인터페이스 | 속도 | IP | 용도 |
-|-----------|------|-----|------|
-| `enp6s0` | 2.5G | 192.168.100.200/24 (고정) | GX10 전용 직결 |
-| `enp0s25` | 1G | 10.20.6.140/20 (DHCP) | 인터넷/사내 LAN (기본 게이트웨이) |
-| `tailscale0` | — | 100.119.79.28 | 원격 접속 VPN |
-
-**GX10**
-
-| 인터페이스 | 속도 | IP | 용도 |
-|-----------|------|-----|------|
-| `enx00e04c4728ca` | 2.5G | 192.168.100.1/24 (고정) | T3610 전용 직결 |
-| `enP7s7` | 1G | 10.20.6.141/20 (DHCP) | 인터넷/사내 LAN (기본 게이트웨이) |
-| `tailscale0` | — | 100.78.1.7 | 원격 접속 VPN |
-
-#### 2.5G 링크 우선순위 정책
-
-GX10과의 모든 통신은 **2.5G 직결(192.168.100.x)이 최우선**입니다.
-
-- Tailscale(100.78.1.7) 및 사내 LAN(10.20.6.141)보다 항상 우선
-- 상호 tailscale IP도 2.5G 경유 static route 설정:
-  - T3610 → GX10 tailscale: `100.78.1.7/32 via 192.168.100.1 dev enp6s0`
-  - GX10 → T3610 tailscale: `100.119.79.28/32 via 192.168.100.200 dev enx00e04c4728ca`
-
-#### 성능 측정 결과 (2026-05-21)
-
-| 항목 | 수치 |
+| 항목 | 결과 |
 |------|------|
-| TCP 송신 (T3610 → GX10) | **2.36 Gbps** (패킷 손실 0%) |
-| TCP 수신 (GX10 → T3610) | **2.35 Gbps** (패킷 손실 0%) |
-| UDP | 1.68 Gbps (손실 0.21%) |
-| 평균 지연 | **0.89 ms** |
-| 링크 활용률 | 94% (2.5G 대비) |
-
-### GX10 서비스 목록
-
-| 포트 | 서비스 | 용도 |
-|------|--------|------|
-| 22 | SSH | 원격 관리 |
-| 11434 | **Ollama** | 로컬 LLM 임베딩 (nomic-embed-text) |
-| 9000 | Portainer | 컨테이너 관리 |
-
-### SSH 접속
-
-```bash
-# GX10 접속 — 2.5G 직결 (최우선, ~/.ssh/config 자동 적용)
-ssh gx10                     # → 192.168.100.1 via 192.168.100.200 (2.5G)
-
-# GX10 접속 — Tailscale fallback (2.5G 링크 불가 시)
-ssh gx10-tail                # → gx10-d74b (tailscale)
-
-# T3610에서 GX10 Ollama 접근
-curl http://192.168.100.1:11434/api/tags    # 2.5G 직결 경유
-```
-
-`~/.ssh/config` 핵심 설정:
-
-```
-Host gx10
-    HostName 192.168.100.1
-    User holee
-    BindAddress 192.168.100.200      # 반드시 2.5G 인터페이스 사용
-    IdentityFile ~/.ssh/id_ed25519
-
-Host 10.20.6.141                     # LAN IP 입력 시 자동 2.5G 리다이렉트
-    HostName 192.168.100.1
-    User holee
-    BindAddress 192.168.100.200
-    IdentityFile ~/.ssh/id_ed25519
-```
-
-### NetworkManager 설정 (재부팅 영속)
-
-netplan YAML 위치: `/etc/netplan/90-NM-d511308b-06c2-3cc4-b7da-8fb9d11b069b.yaml`
-
-```yaml
-network:
-  version: 2
-  ethernets:
-    NM-d511308b-06c2-3cc4-b7da-8fb9d11b069b:
-      renderer: NetworkManager
-      match:
-        name: "enp6s0"
-        macaddress: "88:c9:b3:be:56:a5"
-      addresses:
-      - "192.168.100.200/24"
-      routes:
-      - to: "100.78.1.7/32"        # GX10 tailscale IP도 2.5G 경유
-        via: "192.168.100.1"
-      networkmanager:
-        name: "gx10-2.5G"
-        passthrough:
-          connection.autoconnect-priority: "100"
-          ipv4.never-default: "true"   # 인터넷 기본 게이트웨이로 사용 안 함
-          ipv6.method: "disabled"
-```
-
-### 보안 설정
-
-| 항목 | T3610 | GX10 |
-|------|-------|------|
-| UFW | 활성 (22, 3389, enp6s0 전체, tailscale0 전체) | 활성 (22, 11434, 8080, 9000, 5201) |
-| PermitRootLogin | no (`/etc/ssh/sshd_config.d/99-security.conf`) | no (sshd_config 직접) |
-| `/etc/hosts` | `192.168.100.1 gx10` | `192.168.100.200 t3610` |
+| TCP 송신 (T3610→GX10) | 2.36 Gbps |
+| TCP 수신 (GX10→T3610) | 2.35 Gbps |
+| 평균 지연 | 0.89 ms |
 
 ---
 
@@ -325,175 +320,139 @@ network:
 ```
 hermes-ra/
 ├── skills/ra-expert/                ← RA Expert Skill (에이전트 인텔리전스)
-│   ├── SKILL.md                     ← MFDS / CE MDR / FDA 전문 지식
+│   ├── SKILL.md                     ← MFDS/CE MDR/FDA 전문 지식 + 3계층 검색 지침
 │   ├── scripts/
-│   │   └── rag_search.py            ← Qdrant NAS 검색 헬퍼
+│   │   └── rag_search.py            ← Qdrant 검색 (qwen3-embedding:latest)
 │   └── references/
 │       ├── MFDS_summary.md
 │       ├── CE_MDR_summary.md
 │       └── FDA_summary.md
 ├── scripts/                          ← /opt/hermes-ra/ 배포 대상
 │   ├── hermes-api-server.py         ← OpenAI-compat HTTP 브리지 (:8643)
-│   ├── nas_indexer.py               ← NAS 증분 인덱서
+│   ├── nas_indexer.py               ← NAS 증분 인덱서 (qwen3-embedding, 4096dim)
 │   ├── nas_indexer_v2.py
 │   ├── meta_extractor.py
 │   ├── index_ra_knowledge.py
+│   ├── extract_mail_qa.py
 │   └── index_github_repos.py
 ├── config/
 │   ├── systemd/                      ← systemd 서비스 템플릿
-│   │   ├── hermes-gateway.service
-│   │   └── hermes-api-server.service
 │   ├── dotenv/
-│   │   ├── hermes.env.example       ← 환경변수 키 목록
-│   │   └── hermes-user.env.example
+│   │   └── hermes.env.example
 │   └── nas/
-│       ├── fstab.example
 │       └── nas-ra.creds.example
 ├── workflows/
-│   └── ra-request-to-op_v5.json     ← n8n 활성 워크플로우 (rpi5p에서 실행)
+│   └── ra-request-to-op_v5.json     ← n8n 활성 워크플로우 (rpi5p 실행)
 ├── ops/scripts/
-│   ├── setup_new_pc.sh              ← 신규 PC 자동 셋업
+│   ├── setup_new_pc.sh
 │   ├── qdrant_backup.sh
 │   └── qdrant_restore.sh
-├── docs/
-│   ├── migration/
-│   │   └── MIGRATION_GUIDE.md
-│   ├── design/
-│   └── evaluation/
-├── CLAUDE.md                         ← 개발 작업 지침
+├── docs/migration/MIGRATION_GUIDE.md
+├── CLAUDE.md                         ← Claude Code 작업 지침
 ├── PROJECT_GUIDE.md                  ← 진행 기준 요약
 └── HERMES_RA_PHILOSOPHY.md           ← 운영 철학
 ```
 
 ### LEGACY 파일 (rpi5p 아카이브)
 
-다음 파일들은 기존 rpi5p 기반 시스템의 기록이며 T3610에서는 사용하지 않습니다:
-
-- `scripts/nas_scanner.py` — rpi5p n8n PostgreSQL 연동 전용
-- `scripts/ra_analyze.py` — Ollama 직접 호출 (hermes -z로 대체됨)
-- `hermes-oauth-gateway/` — rpi5p 3-model 게이트웨이 (Codex/Copilot/GLM)
-- `hermes-ra-api/` — rpi5p v5.2 Triple Model
-- `ra_api_server.py` (루트) — rpi5p Python API 서버
+| 경로 | 이유 |
+|------|------|
+| `scripts/nas_scanner.py` | rpi5p PostgreSQL 전용 |
+| `scripts/ra_analyze.py` | `hermes -z`로 대체됨 |
+| `hermes-oauth-gateway/` | rpi5p 3-model gateway |
+| `hermes-ra-api/` | rpi5p v5.2 Triple Model |
+| `ra_api_server.py` (루트) | rpi5p Python API 서버 |
 
 ---
 
 ## 신규 PC 이전
 
-Qdrant 벡터 데이터(544MB, 84,592 포인트)와 인덱싱 상태를 완전하게 이전합니다.
-
-### 방법 A: 스냅샷 이전 (권장, ~분 단위)
+### 방법 A: Qdrant 스냅샷 이전 (권장)
 
 ```bash
-# 1. 소스 PC에서 백업
+# 소스 PC에서 백업
 bash ops/scripts/qdrant_backup.sh ~/.hermes/snapshots/backup_$(date +%Y%m%d)
 rsync -av ~/.hermes/snapshots/backup_YYYYMMDD/ NEW_PC:~/.hermes/snapshots/restore/
 
-# 2. 신규 PC에서 복원
+# 신규 PC에서 복원
 git clone https://github.com/hnabyz-bot/hermes-ra.git
 cd hermes-ra
 sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/restore/
 ```
 
-### 방법 B: NAS 재인덱싱 (스냅샷 없을 때, 수 시간)
+### 방법 B: NAS 재인덱싱 (스냅샷 없을 때)
 
 ```bash
-sudo bash ops/scripts/setup_new_pc.sh --reindex
+# Qdrant Docker 시작 후 전체 재인덱싱
+docker run -d --name qdrant --restart unless-stopped \
+  -p 6333:6333 -v /opt/hermes-ra/qdrant_storage:/qdrant/storage qdrant/qdrant:latest
+python3 /opt/hermes-ra/nas_indexer.py --force-reindex
 ```
 
-상세 절차: **[MIGRATION_GUIDE.md](docs/migration/MIGRATION_GUIDE.md)**
-
----
-
-## [LEGACY] rpi5p 아카이브
-
-아래 내용은 rpi5p 서버에서 운영하던 자체 개발 파이프라인의 기록입니다. T3610에서는 사용하지 않습니다.
-
-### 모델 평가 결과 (Cycle 1-3)
-
-#### 테스트 시나리오 (3가지 규제 상황)
-
-| 상황 | 설명 | Codex | Copilot | GLM |
-|------|------|-------|---------|-----|
-| **TFDA 긴급** | 태국 FDA, 4일 마감 | ✅ | ✅ | ✅ |
-| **EU CE 갱신** | EUDAMED, 3개월 마감 | ✅ | ✅ | ✅ |
-| **FDA 510(k)** | FDA, 30일 마감 | ✅ | ✅ | ✅ |
-| **응답률** | - | **100%** | **100%** | **100%** |
-
-Cycle 3 재평가: GLM 45/45 만점 (2026-05-10 프롬프트 최적화 -34.5% + max_tokens 3000 적용 후)
-
-#### 권장 구성 (Cycle 3 기준)
-
-| 역할 | 모델 | Cycle 3 점수 | 응답시간 | 주 용도 |
-|------|------|------------|---------|--------|
-| **🥇 Primary** | Copilot (Claude Sonnet 4.5) | 43/45 | 45.6초 | NAS 참조 실행 지침 |
-| **🥈 Secondary** | Codex (GPT-4o) | 43/45 | 52.1초 | 규제 의무사항 법적 검토 |
-| **🥉 Tertiary** | GLM (glm-4.5-air) | **45/45** | 54.6초 | 고부하 비용 효율 |
-
-상세 평가 보고서: `docs/evaluation/HERMES_v5.2_EVALUATION_FINAL.md`
-
----
-
-## 문서
-
-- **[CLAUDE.md](CLAUDE.md)** — 개발 작업 지침 및 동작 검증
-- **[PROJECT_GUIDE.md](PROJECT_GUIDE.md)** — 진행 기준 요약
-- **[HERMES_RA_PHILOSOPHY.md](HERMES_RA_PHILOSOPHY.md)** — 운영 철학 및 RA 전문가 기준
-- **[MIGRATION_GUIDE.md](docs/migration/MIGRATION_GUIDE.md)** — 신규 PC 이전 가이드
-- **[hermes-v5-rag-design.md](docs/design/2026-05-07-hermes-v5-rag-design.md)** — RAG 파이프라인 설계
-- **[EVALUATION_FINAL.md](docs/evaluation/HERMES_v5.2_EVALUATION_FINAL.md)** — 모델 평가 보고서 (Cycle 1-3)
+상세: **[MIGRATION_GUIDE.md](docs/migration/MIGRATION_GUIDE.md)**
 
 ---
 
 ## 문제 해결
 
+### Qdrant 컨테이너가 없을 때
+
+```bash
+docker ps -a | grep qdrant
+# 중지된 경우:
+docker start qdrant
+# 아예 없는 경우:
+docker run -d --name qdrant --restart unless-stopped \
+  -p 6333:6333 -v /opt/hermes-ra/qdrant_storage:/qdrant/storage qdrant/qdrant:latest
+```
+
 ### NAS 마운트 확인
 
 ```bash
-# NAS 마운트 상태 확인
 mount | grep nas-ra
-
-# 마운트 안 됨: 재마운트
-sudo mount /mnt/nas-ra
+sudo mount /mnt/nas-ra   # 재마운트 (fstab에 등록된 경우)
 ```
 
-### Qdrant 컬렉션 상태
+### GX10 Ollama 연결 문제
 
 ```bash
-# 컬렉션 목록 및 포인트 수
-python3 -c "
-import urllib.request, json
-resp = json.loads(urllib.request.urlopen('http://localhost:6333/collections').read())
-print('Collections:', len(resp['result']['collections']))
-for c in resp['result']['collections']:
-    info = json.loads(urllib.request.urlopen(f'http://localhost:6333/collections/{c[\"name\"]}').read())
-    print(f'{c[\"name\"]}: {info[\"result\"].get(\"points_count\",\"?\")} points')
-"
-```
-
-### GX10 연결 문제
-
-```bash
-# 2.5G 직결 우선 확인
 ping -c 3 192.168.100.1
-
-# Ollama 접근 확인
 curl http://192.168.100.1:11434/api/tags
+```
 
-# Tailscale fallback
-curl http://100.78.1.7:11434/api/tags
+### 인덱서 임베딩 오류
+
+임베딩 오류 발생 시 GX10의 `qwen3-embedding:latest` 모델 존재 여부 확인:
+
+```bash
+curl -s http://192.168.100.1:11434/api/tags | python3 -c \
+  "import sys,json; models=[m['name'] for m in json.load(sys.stdin)['models']]; print('qwen3-embedding' in str(models))"
 ```
 
 ---
 
-## 연락처 및 링크
+## 문서
 
-- **Repository**: https://github.com/hnabyz-bot/hermes-ra
-- **Issues**: https://github.com/hnabyz-bot/hermes-ra/issues
-- **Email**: hnabyz2023@gmail.com
+- **[CLAUDE.md](CLAUDE.md)** — Claude Code 작업 지침 및 동작 검증
+- **[PROJECT_GUIDE.md](PROJECT_GUIDE.md)** — 진행 기준 요약
+- **[HERMES_RA_PHILOSOPHY.md](HERMES_RA_PHILOSOPHY.md)** — 운영 철학
+- **[MIGRATION_GUIDE.md](docs/migration/MIGRATION_GUIDE.md)** — 신규 PC 이전 가이드
 
 ---
 
-**Last Updated**: 2026-05-22
-**T3610 AI 엔진**: Nous Research Hermes Agent v0.13.0
-**Status**: Active Operation (RA Expert Skill 탑재 완료)
-**인프라**: T3610 ↔ GX10 2.5G 직결 구성 완료
+## [LEGACY] rpi5p 모델 평가 기록 (Cycle 1-3)
+
+| 모델 | Cycle 3 점수 | 역할 |
+|------|------------|------|
+| Copilot (Claude Sonnet 4.5) | 43/45 | NAS 참조 실행 지침 |
+| Codex (GPT-4o) | 43/45 | 규제 의무사항 법적 검토 |
+| GLM (glm-4.5-air) | 45/45 | 고부하 비용 효율 |
+
+상세: `docs/evaluation/HERMES_v5.2_EVALUATION_FINAL.md`
+
+---
+
+**Last Updated**: 2026-05-22  
+**T3610 AI 엔진**: Nous Research Hermes Agent v0.13.0  
+**지식소스**: NAS Qdrant (Docker) + ra-project + MD-process (3계층)  
+**임베딩**: qwen3-embedding:latest (GX10 Ollama, 4096dim)
