@@ -308,6 +308,8 @@ NAS_RA_PATH=/mnt/nas-ra/공통자료/RA
 
 #### 5. NAS 인덱싱
 
+> **전제조건**: NAS가 `/mnt/nas-ra/`에 마운트되어 있어야 합니다.
+
 ```bash
 # 최초 인덱싱 (수 시간 소요)
 python /opt/hermes/nas_indexer.py
@@ -318,7 +320,7 @@ python /opt/hermes/nas_indexer.py --force-reindex
 # 인덱싱 상태 확인
 python3 -c "
 import sqlite3
-conn = sqlite3.connect('/home/raspi5p/workspace/n8n-stack/hermes-ra/indexer_state.db')
+conn = sqlite3.connect('/opt/hermes/indexer_state.db')
 cnt = conn.execute('SELECT COUNT(*) FROM indexed_files').fetchone()[0]
 print(f'인덱싱된 파일: {cnt}개')
 conn.close()
@@ -396,6 +398,8 @@ sudo journalctl -u hermes -f
 
 ### NAS 인덱싱
 
+> **전제조건**: NAS가 `/mnt/nas-ra/`에 마운트되어 있어야 합니다.
+
 ```bash
 # 수동 인덱싱 (변경 파일만)
 python /opt/hermes/nas_indexer.py
@@ -406,7 +410,7 @@ python /opt/hermes/nas_indexer.py --force-reindex
 # 인덱싱 상태 확인
 python3 -c "
 import sqlite3
-conn = sqlite3.connect('/home/raspi5p/workspace/n8n-stack/hermes-ra/indexer_state.db')
+conn = sqlite3.connect('/opt/hermes/indexer_state.db')
 cnt = conn.execute('SELECT COUNT(*) FROM indexed_files').fetchone()[0]
 print(f'인덱싱된 파일: {cnt}개')
 "

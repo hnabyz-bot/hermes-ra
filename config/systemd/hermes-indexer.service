@@ -7,7 +7,7 @@ ExecStart=/usr/bin/python3 /opt/hermes/index_ra_knowledge.py --server
 WorkingDirectory=/opt/hermes
 Restart=always
 RestartSec=5
-User=raspi5p
+User=abyz-lab
 
 [Install]
 WantedBy=multi-user.target

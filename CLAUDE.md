@@ -62,7 +62,13 @@ curl http://localhost:8643/health
 
 ### NAS 인덱싱
 
+> **전제조건**: NAS가 `/mnt/nas-ra/`에 마운트되어 있어야 합니다.
+> T3610에는 현재 NAS가 마운트되어 있지 않습니다. 마운트 후 실행하세요.
+
 ```bash
+# NAS 마운트 확인
+ls /mnt/nas-ra/ 2>/dev/null || echo "NAS 마운트 필요"
+
 # 변경 파일만 증분 인덱싱 (cron 02:00 KST 자동 실행)
 python /opt/hermes/nas_indexer.py
 

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=raspi5p
+User=abyz-lab
 ExecStart=/usr/bin/python3 /opt/hermes/index_github_repos.py --server
 WorkingDirectory=/opt/hermes
 Restart=on-failure

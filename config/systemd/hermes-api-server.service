@@ -5,12 +5,12 @@ Wants=hermes-gateway.service
 
 [Service]
 Type=simple
-User=raspi5p
-WorkingDirectory=/home/raspi5p/.hermes
-EnvironmentFile=/home/raspi5p/.hermes/.env
-Environment=HERMES_BIN=/home/raspi5p/.local/bin/hermes
+User=abyz-lab
+WorkingDirectory=/home/abyz-lab/.hermes
+EnvironmentFile=/opt/hermes/.env
+Environment=HERMES_BIN=/home/abyz-lab/.local/bin/hermes
 Environment=API_SERVER_PORT=8643
-ExecStart=/home/raspi5p/.hermes/hermes-agent/venv/bin/python3 /home/raspi5p/workspace/openproject-stack/scripts/hermes/hermes-api-server.py
+ExecStart=/home/abyz-lab/.hermes/hermes-agent/venv/bin/python3 /opt/hermes/hermes-api-server.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

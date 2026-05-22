@@ -19,7 +19,7 @@ from pathlib import Path
 from datetime import datetime
 
 # meta_extractor 임포트
-sys.path.insert(0, '/home/raspi5p/workspace/hermes')
+sys.path.insert(0, '/opt/hermes')
 try:
     from meta_extractor import extract_file_metadata, ONTOLOGY
 except ImportError:
@@ -33,7 +33,7 @@ except ImportError:
 QDRANT_URL = "http://localhost:6333"
 OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
 COLLECTION = "nas_ra_docs"
-STATE_DB = "/home/raspi5p/workspace/n8n-stack/hermes-ra/indexer_state.db"
+STATE_DB = "/opt/hermes/indexer_state.db"
 LOG_FILE = "/var/log/nas_indexer.log"
 CHUNK_CHARS = 800
 OVERLAP_CHARS = 160
