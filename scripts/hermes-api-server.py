@@ -318,11 +318,18 @@ def chat_completions():
             }
         })
 
-    # Ensure source_docs includes actual RAG hits if LLM left it empty
+    # Ensure source_docs contains real NAS file paths (not LLM-generated index numbers)
     parsed = parse_wp_comment(response_text)
     if parsed and rag_results:
         wpc = parsed.get("wp_comment", {})
-        if not wpc.get("source_docs"):
+        existing = wpc.get("source_docs", [])
+        # Validate: check if any entry has a real file path (contains "/")
+        has_real_paths = any(
+            (isinstance(d, str) and "/" in d)
+            or (isinstance(d, dict) and "/" in d.get("file", ""))
+            for d in existing
+        )
+        if not has_real_paths:
             wpc["source_docs"] = [
                 {
                     "file": r.get("source_file", ""),
