@@ -127,8 +127,8 @@ def _call_openrouter_direct(prompt: str) -> str:
         raise RuntimeError(f"OpenRouter 오류 {e.code}: {body}")
 
 
-def build_ra_prompt(messages: list[dict], metadata: dict, rag_results: list[dict] | None = None) -> str:
-    """Build enriched RA analysis prompt including NAS source documents."""
+def build_ra_prompt(messages: list[dict], metadata: dict, rag_results: list[dict] | None = None, wp_list: str = "") -> str:
+    """Build enriched RA analysis prompt including NAS source documents and WP matching."""
     last_user_content = ""
     for msg in reversed(messages):
         if msg.get("role") == "user":
@@ -169,31 +169,46 @@ def build_ra_prompt(messages: list[dict], metadata: dict, rag_results: list[dict
         parts.append("")
         parts.append("*위 문서를 source_docs 배열에 반드시 인용하세요.*")
 
+    if wp_list.strip():
+        parts.append("")
+        parts.append("## 기존 OpenProject WP 목록 (업무 일감)")
+        parts.append(wp_list)
+        parts.append("")
+        parts.append("*이 이메일과 관련 있는 기존 WP가 있으면 matched_wp_id에 해당 WP ID(숫자)를 넣으세요. 없으면 null.*")
+
     parts.append("")
     parts.append("## 분석 지시사항")
     parts.append(
         "이메일을 분석하여 다음 사항을 판단하세요:\n"
         "\n"
-        "1. **이메일 유형** (정확히 하나 선택):\n"
-        "   - `완료통보`: 이미 완료된 업무 통보 (허가완료, 등록완료, 인증완료 등)\n"
-        "   - `정보수신`: 참고용 정보, 회신 불필요 (공지, 업데이트, 현황보고 등)\n"
-        "   - `액션필요`: 담당자 조치 필요 (심사요청, 서류제출, 기한준수 등)\n"
+        "1. **이메일 유형** (RA 도메인 기준으로 정확히 하나 선택):\n"
+        "   - `완료통보`: 업무 완료 통보. '완료 보고', '등록완료', '허가완료', '인증완료', 'EUDAMED 등록 완료',\n"
+        "     'approved', 'certification complete', '완료 보고건' 포함 시 반드시 완료통보.\n"
+        "   - `액션필요`: 담당자 즉각 조치 필요. 규제기관(CA/FDA/MFDS/식약처/인증기관/NB/정부기관)이\n"
+        "     서류·정보·기술문서 제출 요청, 기한 언급, 심사 보완 요청. 'new request of information',\n"
+        "     'request for information', 'please submit', '제출 요청', '기한:' 포함 시 반드시 액션필요.\n"
+        "   - `정보수신`: 위 두 경우 모두 해당하지 않을 때만. 단순 공지·안내·판매문의 응대 등.\n"
+        "   **[필수]** '완료 보고'/'완료 보고건' → 완료통보 (정보수신 아님).\n"
+        "              규제기관의 '정보 요청'/'서류 요청' → 액션필요 (정보수신 아님).\n"
         "\n"
-        "2. **OpenProject WP 제목** (형식: `[유형] 발신기관/제품 - 핵심업무`):\n"
-        "   - 완료통보 예: `[완료] Licarno - EUDAMED 등록 완료`\n"
-        "   - 정보수신 예: `[정보] 자비텍 - 운용비 지급 안내`\n"
-        "   - 액션필요 예: `[액션] Licarno/Croma - Retrofit+CYAN 기술문서 제출 [2026-05-27]`\n"
+        "2. **OpenProject WP 제목** (형식: `[유형] 발신기관/제품 - 핵심업무 [마감일?]`):\n"
+        "   - 완료: `[완료] EUDAMED - MDR 정보 등록 완료`\n"
+        "   - 액션: `[액션] Licarno/Ukraine - 신규 정보 제출 요청 [2026-06-16]`\n"
+        "   - 정보: `[정보] 자비텍 - 운용비 지급 안내`\n"
         "\n"
-        "3. **시장별 규제 분석** (해당 없으면 null):\n"
-        "   - MFDS: 한국 식약처 관련 사항\n"
-        "   - CE MDR: 유럽 인증 관련 사항\n"
-        "   - FDA: 미국 FDA 관련 사항\n"
+        "3. **기존 WP 매칭**: 위 WP 목록에서 이 이메일과 가장 관련 있는 WP를 찾아 matched_wp_id에 숫자로 반환.\n"
+        "   - EUDAMED 관련 → EUDAMED WP 매칭\n"
+        "   - 해외인증지원사업 → 해외인증지원사업 WP 매칭\n"
+        "   - 완전히 새로운 업무 → null\n"
         "\n"
-        "4. **핵심 정보 추출**: 마감일(YYYY-MM-DD), 제품명, 발신기관, 요청사항\n"
+        "4. **시장별 규제 분석** (해당 없으면 null): MFDS, CE MDR, FDA\n"
+        "\n"
+        "5. **핵심 정보 추출**: 마감일(YYYY-MM-DD), 제품명, 발신기관, 요청사항\n"
         "\n"
         "반드시 다음 JSON 형식으로만 응답하세요 (코드블록 없이 순수 JSON):\n"
         '{"wp_comment": {'
         '"email_type": "완료통보|정보수신|액션필요", '
+        '"matched_wp_id": <기존WP ID 숫자 또는 null>, '
         '"wp_title": "WP 제목 문자열", '
         '"summary": "한국어 2-3문장 업무 요약", '
         '"market_analysis": {"mfds": "내용 또는 null", "ce_mdr": "내용 또는 null", "fda": "내용 또는 null"}, '
@@ -254,6 +269,7 @@ def chat_completions():
             return jsonify({"error": "No messages provided"}), 400
 
     metadata = extract_metadata(data)
+    wp_list = data.get("wp_list", "")
 
     # Layer 1: Qdrant RAG search using email subject as query
     search_query = metadata.get("subject", "")
@@ -264,7 +280,7 @@ def chat_completions():
                 break
     rag_results = _run_rag_search(search_query, top=5)
 
-    prompt = build_ra_prompt(messages, metadata, rag_results)
+    prompt = build_ra_prompt(messages, metadata, rag_results, wp_list=wp_list)
 
     response_text = ""
     errors = []
