@@ -8,7 +8,7 @@ Output: JSON {results: [{text, source_file, score, metadata}]}
 Environment:
   QDRANT_URL   - Qdrant endpoint (default: http://localhost:6333)
   OLLAMA_URL   - Ollama endpoint for embeddings (default: http://192.168.100.1:11434)
-  EMBED_MODEL  - Embedding model (default: nomic-embed-text)
+  EMBED_MODEL  - Embedding model (default: qwen3-embedding:latest)
 """
 import argparse
 import json
@@ -20,20 +20,21 @@ import urllib.error
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.100.1:11434")
-EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
+# qwen3-embedding uses /api/embed with "input" key and returns {"embeddings": [[...]]}
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "qwen3-embedding:latest")
 DEFAULT_COLLECTION = "nas_ra_docs"
 
 
 def embed_query(text: str) -> list[float]:
-    payload = json.dumps({"model": EMBED_MODEL, "prompt": text}).encode()
+    payload = json.dumps({"model": EMBED_MODEL, "input": text}).encode()
     req = urllib.request.Request(
-        f"{OLLAMA_URL}/api/embeddings",
+        f"{OLLAMA_URL}/api/embed",
         data=payload,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         data = json.loads(resp.read())
-    return data["embedding"]
+    return data["embeddings"][0]
 
 
 def search_qdrant(vector: list[float], collection: str, top: int) -> list[dict]:
