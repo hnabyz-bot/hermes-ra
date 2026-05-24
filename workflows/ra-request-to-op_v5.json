@@ -357,7 +357,7 @@
         220
       ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst hermesRaw = $('hermes 분석 API').first().json;\n\n// Parse wp_comment from OpenAI-format response\nlet wpComment = null;\ntry {\n  const contentStr = hermesRaw?.choices?.[0]?.message?.content || '';\n  const clean = contentStr.replace(/```json?\\s*/g, '').replace(/```/g, '').trim();\n  const parsed = JSON.parse(clean);\n  wpComment = parsed?.wp_comment || parsed;\n} catch(e) {\n  wpComment = null;\n}\n\nconst nas_refs = (wpComment && wpComment.source_docs) || [];\nconst emailType = data.emailType || wpComment?.email_type || '액션필요';\nconst typeIcon = emailType === '완료통보' ? '✅' : emailType === '정보수신' ? 'ℹ️' : '⚡';\n\nlet comment_body = '';\nif (wpComment && wpComment.recommendation) {\n  const h = wpComment;\n  const confidenceIcon = { high: '🟢', medium: '🟡', low: '🔴' }[h.confidence] || '🟡';\n  const confidenceLabel = { high: '높음', medium: '보통', low: '낮음' }[h.confidence] || '보통';\n\n  let rows = `| 유형 | ${typeIcon} **${emailType}** |\\n`;\n  rows += `| 신뢰도 | ${confidenceIcon} **${confidenceLabel}** |\\n`;\n  if (h.deadline) rows += `| ⏰ 기한 | **${h.deadline}** |\\n`;\n  if (h.org) rows += `| 🏢 발신기관 | ${h.org} |\\n`;\n  if (h.product) rows += `| 📦 제품 | ${h.product} |\\n`;\n\n  let c = `## [Hermes] RA 대응 가이드\\n\\n`;\n  c += `| 항목 | 내용 |\\n|---|---|\\n${rows}\\n`;\n  c += `### 권고 조치\\n${h.recommendation}\\n\\n`;\n  if (h.summary) c += `### 업무 요약\\n${h.summary}\\n\\n`;\n\n  const ma = h.market_analysis || {};\n  const maItems = [];\n  if (ma.mfds) maItems.push(`- **MFDS**: ${ma.mfds}`);\n  if (ma.ce_mdr) maItems.push(`- **CE MDR**: ${ma.ce_mdr}`);\n  if (ma.fda) maItems.push(`- **FDA**: ${ma.fda}`);\n  if (maItems.length > 0) c += `### 시장 규제 분석\\n${maItems.join('\\n')}\\n\\n`;\n  if (nas_refs.length > 0) c += `### 참고 문서\\n${nas_refs.map(r => `- ${r}`).join('\\n')}\\n\\n`;\n  c += `---\\n*Hermes RA Agent 자동 분석*`;\n  comment_body = c;\n} else {\n  const h = data.hermesData || {};\n  const confidenceIcon = { high: '🟢', medium: '🟡', low: '🔴' }[h.confidence] || '🟡';\n  const confidenceLabel = { high: '높음', medium: '보통', low: '낮음' }[h.confidence] || '보통';\n\n  let rows = `| 유형 | ${typeIcon} **${emailType}** |\\n`;\n  rows += `| 신뢰도 | ${confidenceIcon} **${confidenceLabel}** |\\n`;\n  if (h.deadline) rows += `| ⏰ 기한 | **${h.deadline}** |\\n`;\n  if (h.org) rows += `| 🏢 발신기관 | ${h.org} |\\n`;\n\n  let c = `## [Hermes] RA 대응 가이드\\n\\n`;\n  c += `| 항목 | 내용 |\\n|---|---|\\n${rows}\\n`;\n  c += `### 권고 조치\\n${h.recommendation || '(원본 메일 확인 후 조치 결정)'}\\n\\n`;\n  if (h.summary) c += `### 업무 요약\\n${h.summary}\\n\\n`;\n  if (nas_refs.length > 0) c += `### NAS 참고 파일\\n${nas_refs.map(r => `- ${r}`).join('\\n')}\\n\\n`;\n  c += `---\\n*Hermes RA Agent 자동 분석 (fallback)*`;\n  comment_body = c;\n}\n\nreturn [{ json: { ...data, comment_body, commentBody: JSON.stringify({ comment: { raw: comment_body } }) } }];"
+        "jsCode": "const data = $input.first().json;\n\n// Skip comment posting if flagged (e.g. null matchedId path)\nif (data._skip_comment) {\n  return [{ json: { ...data, comment_body: '', commentBody: '', _skip_comment: true } }];\n}\n\nconst hermesRaw = $('hermes 분석 API').first().json;\n\n// Parse wp_comment from OpenAI-format response\nlet wpComment = null;\ntry {\n  const contentStr = hermesRaw?.choices?.[0]?.message?.content || '';\n  const clean = contentStr.replace(/```json?\\s*/g, '').replace(/```/g, '').trim();\n  const parsed = JSON.parse(clean);\n  wpComment = parsed?.wp_comment || parsed;\n} catch(e) {\n  wpComment = null;\n}\n\nconst nas_refs = (wpComment && wpComment.source_docs) || [];\nconst emailType = data.emailType || wpComment?.email_type || '액션필요';\nconst typeIcon = emailType === '완료통보' ? '✅' : emailType === '정보수신' ? 'ℹ️' : '⚡';\n\nfunction formatSourceDocs(refs) {\n  if (!refs || refs.length === 0) return '';\n  return refs.map(r => {\n    if (typeof r === 'object' && r.file) {\n      const score = r.score ? ` (관련도: ${r.score})` : '';\n      const excerpt = r.excerpt ? `\\n  > ${r.excerpt.substring(0, 150).replace(/\\n/g, ' ')}` : '';\n      return `- **${r.file}**${score}${excerpt}`;\n    }\n    return `- ${r}`;\n  }).join('\\n');\n}\n\nlet comment_body = '';\nif (wpComment && wpComment.recommendation) {\n  const h = wpComment;\n  const confidenceIcon = { high: '🟢', medium: '🟡', low: '🔴' }[h.confidence] || '🟡';\n  const confidenceLabel = { high: '높음', medium: '보통', low: '낮음' }[h.confidence] || '보통';\n\n  let rows = `| 유형 | ${typeIcon} **${emailType}** |\\n`;\n  rows += `| 신뢰도 | ${confidenceIcon} **${confidenceLabel}** |\\n`;\n  if (h.deadline) rows += `| ⏰ 기한 | **${h.deadline}** |\\n`;\n  if (h.org) rows += `| 🏢 발신기관 | ${h.org} |\\n`;\n  if (h.product) rows += `| 📦 제품 | ${h.product} |\\n`;\n\n  let c = `## [Hermes] RA 대응 가이드\\n\\n`;\n  c += `| 항목 | 내용 |\\n|---|---|\\n${rows}\\n`;\n  c += `### 권고 조치\\n${h.recommendation}\\n\\n`;\n  if (h.summary) c += `### 업무 요약\\n${h.summary}\\n\\n`;\n\n  const ma = h.market_analysis || {};\n  const maItems = [];\n  if (ma.mfds) maItems.push(`- **MFDS**: ${ma.mfds}`);\n  if (ma.ce_mdr) maItems.push(`- **CE MDR**: ${ma.ce_mdr}`);\n  if (ma.fda) maItems.push(`- **FDA**: ${ma.fda}`);\n  if (maItems.length > 0) c += `### 시장 규제 분석\\n${maItems.join('\\n')}\\n\\n`;\n\n  const nasFormatted = formatSourceDocs(nas_refs);\n  if (nasFormatted) c += `### NAS 참고 문서 (RAG)\\n${nasFormatted}\\n\\n`;\n\n  c += `---\\n*Hermes RA Agent 자동 분석 (3-layer RAG + GLM-4-Air)*`;\n  comment_body = c;\n} else {\n  const h = data.hermesData || {};\n  const confidenceIcon = { high: '🟢', medium: '🟡', low: '🔴' }[h.confidence] || '🟡';\n  const confidenceLabel = { high: '높음', medium: '보통', low: '낮음' }[h.confidence] || '보통';\n\n  let rows = `| 유형 | ${typeIcon} **${emailType}** |\\n`;\n  rows += `| 신뢰도 | ${confidenceIcon} **${confidenceLabel}** |\\n`;\n  if (h.deadline) rows += `| ⏰ 기한 | **${h.deadline}** |\\n`;\n  if (h.org) rows += `| 🏢 발신기관 | ${h.org} |\\n`;\n\n  let c = `## [Hermes] RA 대응 가이드\\n\\n`;\n  c += `| 항목 | 내용 |\\n|---|---|\\n${rows}\\n`;\n  c += `### 권고 조치\\n${h.recommendation || '(원본 메일 확인 후 조치 결정)'}\\n\\n`;\n  if (h.summary) c += `### 업무 요약\\n${h.summary}\\n\\n`;\n\n  const nasFormatted = formatSourceDocs(nas_refs);\n  if (nasFormatted) c += `### NAS 참고 문서 (RAG)\\n${nasFormatted}\\n\\n`;\n\n  c += `---\\n*Hermes RA Agent 자동 분석 (fallback)*`;\n  comment_body = c;\n}\n\nreturn [{ json: { ...data, comment_body, commentBody: JSON.stringify({ comment: { raw: comment_body } }) } }];"
       }
     },
     {
@@ -413,122 +413,6 @@
       "webhookId": "6f2231cb-d983-409a-8431-79b8784de6a3"
     },
     {
-      "id": "uuid-18",
-      "name": "Codex 분석 (GPT-4)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        950,
-        600
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "http://10.20.6.140:8643/v1/chat/completions",
-        "sendBody": true,
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({\n  \"model\": \"gpt-4\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"당신은 규제 문서 분석 전문가입니다. Hermes 기본 분석 결과와 참고 자료를 바탕으로, 더 깊이있는 RA 대응 전략을 제시하세요.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"## Hermes 기본 분석\\n\" + JSON.stringify($('hermes 분석 API').first().json) + \"\\n\\n## 원본 메일\\n\" + ($json.bodyForOllama || $json.body || \"\")\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 2000\n}) }}",
-        "options": {
-          "timeout": 120000
-        },
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer 10cc6bbfde9f63f77dfa3e1ca34ae745b13fd0e2f06bd93b314aafd8227848f7"
-            }
-          ]
-        },
-        "rawContentType": "application/json",
-        "sendHeaders": true
-      }
-    },
-    {
-      "id": "uuid-19",
-      "name": "Copilot 분석 (Claude)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        950,
-        750
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "http://10.20.6.140:8643/v1/chat/completions",
-        "sendBody": true,
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({\n  \"model\": \"claude-sonnet-4\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"당신은 규제 문서 분석 전문가입니다. Hermes 기본 분석 결과와 참고 자료를 바탕으로, 더 깊이있는 RA 대응 전략을 제시하세요.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"## Hermes 기본 분석\\n\" + JSON.stringify($('hermes 분석 API').first().json) + \"\\n\\n## 원본 메일\\n\" + ($json.bodyForOllama || $json.body || \"\")\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 2000\n}) }}",
-        "options": {
-          "timeout": 120000
-        },
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer 10cc6bbfde9f63f77dfa3e1ca34ae745b13fd0e2f06bd93b314aafd8227848f7"
-            }
-          ]
-        },
-        "rawContentType": "application/json",
-        "sendHeaders": true
-      }
-    },
-    {
-      "id": "uuid-glm",
-      "name": "GLM 분석 (Zhipu AI)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        950,
-        900
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "http://10.20.6.140:8643/v1/chat/completions",
-        "sendBody": true,
-        "contentType": "raw",
-        "body": "={{ JSON.stringify({\n  \"model\": \"glm-4.5-air\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"당신은 규제 문서 분석 전문가입니다. Hermes 기본 분석 결과와 참고 자료를 바탕으로, 더 깊이있는 RA 대응 전략을 제시하세요.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"## Hermes 기본 분석\\n\" + JSON.stringify($('hermes 분석 API').first().json) + \"\\n\\n## 원본 메일\\n\" + ($json.bodyForOllama || $json.body || \"\")\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 2000\n}) }}",
-        "options": {
-          "timeout": 300000
-        },
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer 10cc6bbfde9f63f77dfa3e1ca34ae745b13fd0e2f06bd93b314aafd8227848f7"
-            }
-          ]
-        },
-        "rawContentType": "application/json",
-        "sendHeaders": true
-      }
-    },
-    {
-      "id": "uuid-20",
-      "name": "3-모델 결과 통합",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 1,
-      "position": [
-        1150,
-        675
-      ],
-      "parameters": {
-        "jsCode": "// Runs once per model (3 times: Codex, GLM, Copilot)\n// Use items[] (legacy API) for cross-version compatibility\nconst modelResponse = (items && items.length > 0) ? items[0].json : {};\n\n// Skip if no input (model node failed)\nif (!modelResponse || !modelResponse.choices) return [];\n\n// Get WP ID from creation branch (completes before slow model analysis)\nlet createdWpId = null;\ntry {\n  createdWpId = $('결과 통합').first().json.createdWpId;\n} catch(e) {}\n\nconst modelText = modelResponse.choices[0]?.message?.content || '(응답 없음)';\nconst modelTokens = modelResponse.usage || {};\nconst rawModel = modelResponse.model || 'unknown';\n\nreturn [{\n  json: {\n    createdWpId,\n    modelResult: {\n      model: rawModel,\n      content: modelText,\n      inputTokens: modelTokens.prompt_tokens || 0,\n      outputTokens: modelTokens.completion_tokens || 0,\n      totalTokens: modelTokens.total_tokens || 0\n    }\n  }\n}];"
-      }
-    },
-    {
-      "id": "uuid-21",
-      "name": "모델별 댓글 생성",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 1,
-      "position": [
-        1350,
-        675
-      ],
-      "parameters": {
-        "jsCode": "const modelResponse = (items && items.length > 0) ? items[0].json : {};\nconst wpId = modelResponse.createdWpId;\nconst model = modelResponse.modelResult;\n\nif (!wpId || !model || !model.content || model.content === '(응답 없음)') {\n  return [];\n}\n\nconst commentContent = `🤖 **${model.model} 분석 결과**\\n\\n${model.content}\\n\\n📊 토큰: 입력 ${model.inputTokens} / 출력 ${model.outputTokens} / 합계 ${model.totalTokens}`;\n\nreturn [{\n  json: {\n    createdWpId: wpId,\n    commentBody: JSON.stringify({ comment: { raw: commentContent } })\n  }\n}];"
-      }
-    },
-    {
       "id": "email-type-branch",
       "name": "이메일 유형?",
       "type": "n8n-nodes-base.if",
@@ -577,7 +461,7 @@
         460
       ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n// Route to existing matched WP — no new WP creation needed\nreturn [{ json: {\n  createdWpId: data.matchedId,\n  createdWpSubject: data.matchedTitle || data.wpTitle,\n  messageId: data.messageId,\n  mailSubject: data.subject,\n  hasMatch: data.hasMatch,\n  matchedId: data.matchedId,\n  hermesData: data.hermesData,\n  emailType: data.emailType\n} }];"
+        "jsCode": "const data = $input.first().json;\n// Route to existing matched WP — no new WP creation needed\n// Guard: matchedId must be non-null; if null fall through without action\nif (!data.matchedId) {\n  return [{ json: {\n    createdWpId: null,\n    createdWpSubject: data.wpTitle || '',\n    messageId: data.messageId,\n    mailSubject: data.subject,\n    hasMatch: false,\n    matchedId: null,\n    hermesData: data.hermesData,\n    emailType: data.emailType,\n    _skip_comment: true\n  } }];\n}\nreturn [{ json: {\n  createdWpId: data.matchedId,\n  createdWpSubject: data.matchedTitle || data.wpTitle,\n  messageId: data.messageId,\n  mailSubject: data.subject,\n  hasMatch: data.hasMatch,\n  matchedId: data.matchedId,\n  hermesData: data.hermesData,\n  emailType: data.emailType\n} }];"
       }
     }
   ],
@@ -692,36 +576,6 @@
         ]
       ]
     },
-    "Codex 분석 (GPT-4)": {
-      "main": [
-        [
-          {
-            "node": "3-모델 결과 통합",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Copilot 분석 (Claude)": {
-      "main": [
-        [
-          {
-            "node": "3-모델 결과 통합",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "GLM 분석 (Zhipu AI)": {
-      "main": [
-        [
-          {
-            "node": "3-모델 결과 통합",
-            "index": 2
-          }
-        ]
-      ]
-    },
     "WP 본문 생성": {
       "main": [
         [
@@ -805,26 +659,6 @@
     "Gmail 읽음 처리": {
       "main": [
         []
-      ]
-    },
-    "3-모델 결과 통합": {
-      "main": [
-        [
-          {
-            "node": "모델별 댓글 생성",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "모델별 댓글 생성": {
-      "main": [
-        [
-          {
-            "node": "WP 댓글 POST",
-            "index": 0
-          }
-        ]
       ]
     },
     "이메일 유형?": {
