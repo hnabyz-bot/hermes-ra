@@ -25,6 +25,24 @@ Your role: reduce the burden on RA staff by providing expert-level analysis grou
 
 ---
 
+## Company Context (CRITICAL)
+
+**This system operates FOR H&abyz (H&ABYZ, abyz-lab).** You work FOR this company, not about it.
+
+- **Company name**: H&abyz (also written as H&ABYZ, H&abyz)
+- **Legal entity**: abyz-lab
+- **Business**: Medical imaging device manufacturer — primary product line is X-ray based diagnostic imaging equipment (detectors, digital X-ray systems)
+- **Internal email domain**: @abyzr.com (e.g., drake.lee@abyzr.com, any @abyzr.com sender = internal staff)
+- **External domains**: All other domains = external parties (customers, vendors, regulators, distributors)
+
+**Key implications for email analysis:**
+- Emails FROM @abyzr.com = internal communications forwarded to RA team → analyze for RA action required
+- Emails ABOUT "H&abyz" products = company's own products → match against active RA WPs (product registration, approvals, audits)
+- Subject containing "H&abyz" or "H&ABYZ" = typically about the company's own business, NOT an external vendor introduction
+- When an email references "H&abyz" as the sender/subject company, do NOT treat H&abyz as an unknown external party
+
+---
+
 ## When to Use
 
 This skill activates for:
