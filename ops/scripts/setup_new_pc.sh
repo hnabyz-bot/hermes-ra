@@ -95,11 +95,11 @@ if [ ! -f "$HERMES_RA_DIR/.env" ]; then
         cp "$REPO_ROOT/config/dotenv/hermes.env.example" "$HERMES_RA_DIR/.env"
     else
         cat > "$HERMES_RA_DIR/.env" << 'ENVEOF'
-GLM_API_KEY=
 OPENPROJECT_API_KEY=
 OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 QDRANT_URL=http://localhost:6333
 OLLAMA_URL=http://192.168.100.1:11434
+EMBED_MODEL=qwen3-embedding:latest
 NAS_RA_PATH=/mnt/nas-ra/공통자료/RA
 API_SERVER_KEY=
 HERMES_BIN=/home/abyz-lab/.local/bin/hermes
@@ -110,7 +110,7 @@ ENVEOF
     chown "$HERMES_USER:$HERMES_USER" "$HERMES_RA_DIR/.env"
     chmod 600 "$HERMES_RA_DIR/.env"
     echo "[5/8] .env 템플릿 생성 → $HERMES_RA_DIR/.env 편집 필요"
-    echo "   필수: GLM_API_KEY, OPENPROJECT_API_KEY, API_SERVER_KEY"
+    echo "   필수: OPENPROJECT_API_KEY, API_SERVER_KEY"
     echo "   OLLAMA_URL=http://192.168.100.1:11434 (GX10 2.5G 직결)"
 else
     echo "[5/8] .env 이미 존재, 건너뜀"
@@ -175,7 +175,7 @@ echo ""
 echo "=== 셋업 완료 ==="
 echo ""
 echo "다음 단계:"
-echo "  1. $HERMES_RA_DIR/.env 편집 (GLM_API_KEY, OPENPROJECT_API_KEY, API_SERVER_KEY)"
+echo "  1. $HERMES_RA_DIR/.env 편집 (OPENPROJECT_API_KEY, API_SERVER_KEY)"
 echo "  2. $NAS_CREDS 편집 (username, password)"
 echo "  3. mount $NAS_MOUNT"
 echo "  4. systemctl enable --now hermes-gateway hermes-api-server"

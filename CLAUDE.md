@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 설정 파일 | `~/.hermes/config.yaml` |
 | RA 스킬 경로 | `~/.hermes/skills/ra-expert/` |
 | 로그 | `~/.hermes/logs/agent.log` |
-| 기본 모델 | gpt-5.5 (openai-codex), GLM-4.5-air 사용 가능 |
+| 기본 모델 | Hermes Agent 내부 설정 (~/.hermes/config.yaml model.default) |
 
 ---
 
@@ -164,11 +164,11 @@ sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/res
 ## 환경변수 (실제 파일: `/opt/hermes-ra/.env`)
 
 ```bash
-GLM_API_KEY=sk_xxxxx              # z.ai API 키 (GLM-4.5-air)
 OPENPROJECT_API_KEY=xxxxx
 OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 QDRANT_URL=http://localhost:6333
 OLLAMA_URL=http://192.168.100.1:11434  # GX10 2.5G 직결 (임베딩)
+EMBED_MODEL=qwen3-embedding:latest
 NAS_RA_PATH=/mnt/nas-ra/공통자료/RA
 API_SERVER_KEY=<secret>            # hermes-api-server.py Bearer 인증
 HERMES_BIN=/home/abyz-lab/.local/bin/hermes
@@ -189,6 +189,73 @@ GX10 서비스: Ollama (:11434), Portainer (:9000)
 rpi5p 서비스: n8n (:5678), OpenProject (plm.abyz-lab.work)
 
 **GX10 통신 우선순위**: 2.5G 직결(192.168.100.x) > Tailscale > LAN
+
+---
+
+## SCOPE BOUNDARIES (HARD RULES) — 절대 경계
+
+이 규칙들은 매 작업 시작 전 반드시 확인한다. 위반 시 즉시 중단하고 수정한다.
+
+### [HARD-1] Nous Hermes Agent는 PRIMARY 엔진이다
+
+**Nous Research Hermes Agent v0.13.0 (`hermes -z --skills ra-expert`)는 항상 PRIMARY 호출 대상이다.**
+
+- GLM, OpenRouter, 기타 LLM API는 Hermes 실패 시 fallback으로만 허용
+- Hermes를 last resort로 강등하는 코드는 목표 위반이다
+- 이 프로젝트는 Hermes를 자체 개발하는 게 아니라 **Hermes를 성장시키는** 프로젝트다
+
+위반 패턴:
+```python
+# WRONG: 외부 LLM을 primary로, Hermes를 last resort로 두는 구조
+if EXTERNAL_LLM_KEY:
+    response = _call_external_llm(prompt)  # ← 위반
+if not response:
+    result = subprocess.run(["hermes", "-z", ...])  # ← Hermes가 last resort
+```
+
+올바른 패턴:
+```python
+# CORRECT: Hermes를 primary로, 외부 LLM은 불필요 (제거)
+result = subprocess.run(["hermes", "-z", context, "--skills", "ra-expert"])  # primary only
+```
+
+### [HARD-2] RA 판단 로직은 SKILL.md에만 존재한다
+
+**이메일 분류 규칙, WP 제목 형식, 규제 판단 기준 — 모든 RA 도메인 지식은 `skills/ra-expert/SKILL.md`에만 존재해야 한다.**
+
+- Python/JS 코드에 RA 판단 로직을 하드코딩하면 안 된다
+- `hermes-api-server.py`는 순수한 "얇은 HTTP 브리지"여야 한다 (인증, 라우팅, 결과 포맷만)
+- SKILL.md를 수정해야 에이전트 능력이 향상되어야 한다. 코드 수정으로 RA 능력이 향상되면 설계가 잘못된 것이다
+
+위반 징후:
+- `build_ra_prompt()`처럼 RA 분류 규칙을 Python 함수 안에 긴 문자열로 하드코딩
+- 이메일 유형 판별 로직이 SKILL.md가 아닌 코드에 있음
+
+### [HARD-3] 인프라 코드 vs 인텔리전스 코드 분리
+
+| 계층 | 경로 | 허용 내용 |
+|------|------|---------|
+| 인텔리전스 | `skills/ra-expert/` | RA 전문 지식, 판단 기준, 규정 요약 |
+| 인프라 | `scripts/`, `ops/scripts/` | HTTP 브리지, NAS 인덱싱, 임베딩 파이프라인 |
+
+인프라 코드(`scripts/`)가 RA 판단 로직을 포함하면 경계 위반이다.
+
+### [HARD-4] 자체 AI 에이전트 개발 금지
+
+**새로운 LLM 호출 체인, 멀티모델 캐스케이드, 자체 에이전트 프레임워크를 만들면 안 된다.**
+
+- rpi5p의 3-model cascade(`hermes-oauth-gateway/`, `hermes-ra-api/`)는 이미 폐기된 설계다
+- Hermes Agent의 스킬 시스템을 활용하는 것이 올바른 접근이다
+- 새 LLM 통합이 필요하다면 Hermes config(`~/.hermes/config.yaml`)를 통해 설정한다
+
+---
+
+## 알려진 목표 이탈 이력
+
+### [수정완료 2026-05-26] hermes-api-server.py — 엔진 우선순위 역전
+
+**위반 내용**: GLM-4-Air primary, hermes last resort. `build_ra_prompt()`가 SKILL.md 분류 로직을 Python에 중복.
+**수정 내용**: GLM/OpenRouter 전면 제거. `hermes -z --skills ra-expert` 단독 primary. `build_context()`로 축소(메타데이터+RAG만). 이메일 분류 규칙을 SKILL.md로 이전.
 
 ---
 

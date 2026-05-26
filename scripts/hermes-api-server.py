@@ -4,11 +4,13 @@ hermes-api-server.py — Hermes RA OpenAI-compatible HTTP bridge
 Port: 8643 (0.0.0.0)
 Auth: Authorization: Bearer <API_SERVER_KEY>
 
-3-layer knowledge pipeline:
-  1. Qdrant RAG search (Layer 1) via rag_search.py + qwen3-embedding
-  2. Enriched prompt includes NAS source documents + RA classification
-  3. LLM call: GLM-4-Air (primary) → OpenRouter (fallback) → hermes -z (last resort)
-  4. Returns wp_comment JSON for OpenProject WP comment posting
+Pipeline:
+  1. Qdrant RAG search (Layer 1) — NAS company documents
+  2. Build context (email metadata + RAG results + WP list)
+  3. hermes -z <context> --skills ra-expert  (PRIMARY, sole LLM engine)
+  4. Return wp_comment JSON for OpenProject WP comment posting
+
+RA classification rules and output format are defined in SKILL.md, not here.
 """
 
 import json
@@ -28,15 +30,6 @@ HERMES_MAX_TOKENS = int(os.environ.get("HERMES_MAX_TOKENS", "4096"))
 PORT = int(os.environ.get("API_SERVER_PORT", "8643"))
 TIMEOUT = int(os.environ.get("HERMES_TIMEOUT", "120"))
 RAG_TIMEOUT = int(os.environ.get("RAG_TIMEOUT", "60"))
-
-# GLM API (primary)
-GLM_API_KEY = os.environ.get("GLM_API_KEY", "")
-GLM_BASE_URL = os.environ.get("GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
-GLM_MODEL = os.environ.get("GLM_MODEL", "glm-4-air-250414")
-
-# OpenRouter (fallback)
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
 # Layer 1: Qdrant RAG
 RAG_SCRIPT = os.environ.get("RAG_SCRIPT", "/opt/hermes-ra/skills/ra-expert/scripts/rag_search.py")
@@ -77,58 +70,10 @@ def _run_rag_search(query: str, top: int = 5) -> list[dict]:
     return []
 
 
-def _call_glm_direct(prompt: str) -> str:
-    """Call GLM-4-Air API directly."""
-    payload = json.dumps({
-        "model": GLM_MODEL,
-        "max_tokens": HERMES_MAX_TOKENS,
-        "messages": [{"role": "user", "content": prompt}],
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        f"{GLM_BASE_URL}/chat/completions",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {GLM_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-            return result["choices"][0]["message"]["content"]
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:300]
-        raise RuntimeError(f"GLM API 오류 {e.code}: {body}")
-
-
-def _call_openrouter_direct(prompt: str) -> str:
-    """Call OpenRouter API directly (fallback)."""
-    payload = json.dumps({
-        "model": OPENROUTER_MODEL,
-        "max_tokens": HERMES_MAX_TOKENS,
-        "messages": [{"role": "user", "content": prompt}],
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-            return result["choices"][0]["message"]["content"]
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:300]
-        raise RuntimeError(f"OpenRouter 오류 {e.code}: {body}")
-
-
-def build_ra_prompt(messages: list[dict], metadata: dict, rag_results: list[dict] | None = None, wp_list: str = "") -> str:
-    """Build enriched RA analysis prompt including NAS source documents and WP matching."""
+def build_context(messages: list[dict], metadata: dict, rag_results: list[dict], wp_list: str) -> str:
+    """Build context for Hermes: email data + RAG results + WP list.
+    RA classification rules and output format are in SKILL.md, not here.
+    """
     last_user_content = ""
     for msg in reversed(messages):
         if msg.get("role") == "user":
@@ -141,90 +86,40 @@ def build_ra_prompt(messages: list[dict], metadata: dict, rag_results: list[dict
     if isinstance(attachments, str):
         attachments = [attachments] if attachments else []
 
-    parts = [
-        "당신은 의료기기 규제 인허가(RA) 전문 에이전트입니다. 아래 수신 이메일을 분석하세요.",
-        "",
-        "## 수신 이메일",
-    ]
+    parts = ["## 수신 이메일"]
     if subject:
-        parts.append(f"**제목**: {subject}")
+        parts.append(f"제목: {subject}")
     if sender:
-        parts.append(f"**발신자**: {sender}")
+        parts.append(f"발신자: {sender}")
     if attachments:
-        parts.append(f"**첨부파일**: {', '.join(str(a) for a in attachments)}")
+        parts.append(f"첨부파일: {', '.join(str(a) for a in attachments)}")
     parts.append("")
-    parts.append("**본문**:")
     parts.append(last_user_content)
 
     if rag_results:
         parts.append("")
-        parts.append("## NAS 문서 검색 결과 (Layer 1 — 회사 원본 문서)")
+        parts.append("## NAS 문서 검색 결과")
         for i, r in enumerate(rag_results[:5], 1):
             src = r.get("source_file", "unknown")
             score = r.get("score", 0)
             text = r.get("text", "")[:400]
-            parts.append(f"### [{i}] {src} (관련도: {score:.3f})")
+            parts.append(f"[{i}] {src} (관련도: {score:.3f})")
             if text:
                 parts.append(text)
         parts.append("")
-        parts.append("*위 문서를 source_docs 배열에 반드시 인용하세요.*")
+        parts.append("위 문서를 source_docs에 인용하세요.")
 
     if wp_list.strip():
         parts.append("")
-        parts.append("## 기존 OpenProject WP 목록 (업무 일감)")
+        parts.append("## 기존 OpenProject WP 목록")
         parts.append(wp_list)
         parts.append("")
-        parts.append("*이 이메일과 관련 있는 기존 WP가 있으면 matched_wp_id에 해당 WP ID(숫자)를 넣으세요. 없으면 null.*")
-
-    parts.append("")
-    parts.append("## 분석 지시사항")
-    parts.append(
-        "이메일을 분석하여 다음 사항을 판단하세요:\n"
-        "\n"
-        "1. **이메일 유형** (RA 도메인 기준으로 정확히 하나 선택):\n"
-        "   - `완료통보`: 업무 완료 통보. '완료 보고', '등록완료', '허가완료', '인증완료', 'EUDAMED 등록 완료',\n"
-        "     'approved', 'certification complete', '완료 보고건' 포함 시 반드시 완료통보.\n"
-        "   - `액션필요`: 담당자 즉각 조치 필요. 규제기관(CA/FDA/MFDS/식약처/인증기관/NB/정부기관)이\n"
-        "     서류·정보·기술문서 제출 요청, 기한 언급, 심사 보완 요청. 'new request of information',\n"
-        "     'request for information', 'please submit', '제출 요청', '기한:' 포함 시 반드시 액션필요.\n"
-        "   - `정보수신`: 위 두 경우 모두 해당하지 않을 때만. 단순 공지·안내·판매문의 응대 등.\n"
-        "   **[필수]** '완료 보고'/'완료 보고건' → 완료통보 (정보수신 아님).\n"
-        "              규제기관의 '정보 요청'/'서류 요청' → 액션필요 (정보수신 아님).\n"
-        "\n"
-        "2. **OpenProject WP 제목** (형식: `[유형] 발신기관/제품 - 핵심업무 [마감일?]`):\n"
-        "   - 완료: `[완료] EUDAMED - MDR 정보 등록 완료`\n"
-        "   - 액션: `[액션] Licarno/Ukraine - 신규 정보 제출 요청 [2026-06-16]`\n"
-        "   - 정보: `[정보] 자비텍 - 운용비 지급 안내`\n"
-        "\n"
-        "3. **기존 WP 매칭**: 위 WP 목록에서 이 이메일과 가장 관련 있는 WP를 찾아 matched_wp_id에 숫자로 반환.\n"
-        "   - EUDAMED 관련 → EUDAMED WP 매칭\n"
-        "   - 해외인증지원사업 → 해외인증지원사업 WP 매칭\n"
-        "   - 완전히 새로운 업무 → null\n"
-        "\n"
-        "4. **시장별 규제 분석** (해당 없으면 null): MFDS, CE MDR, FDA\n"
-        "\n"
-        "5. **핵심 정보 추출**: 마감일(YYYY-MM-DD), 제품명, 발신기관, 요청사항\n"
-        "\n"
-        "반드시 다음 JSON 형식으로만 응답하세요 (코드블록 없이 순수 JSON):\n"
-        '{"wp_comment": {'
-        '"email_type": "완료통보|정보수신|액션필요", '
-        '"matched_wp_id": <기존WP ID 숫자 또는 null>, '
-        '"wp_title": "WP 제목 문자열", '
-        '"summary": "한국어 2-3문장 업무 요약", '
-        '"market_analysis": {"mfds": "내용 또는 null", "ce_mdr": "내용 또는 null", "fda": "내용 또는 null"}, '
-        '"source_docs": [], '
-        '"recommendation": "구체적인 다음 단계 권고사항", '
-        '"confidence": "high|medium|low", '
-        '"deadline": "YYYY-MM-DD 또는 null", '
-        '"product": "제품명 또는 null", '
-        '"org": "발신기관 또는 null"}}'
-    )
+        parts.append("이 이메일과 관련 있는 WP가 있으면 matched_wp_id에 숫자로 반환하세요. 없으면 null.")
 
     return "\n".join(parts)
 
 
 def extract_metadata(data: dict) -> dict:
-    """Extract RA metadata from the request payload (set by n8n workflow)."""
     return {
         "subject": data.get("subject", data.get("mail_subject", "")),
         "sender": data.get("sender", data.get("mail_sender", data.get("from", ""))),
@@ -233,7 +128,7 @@ def extract_metadata(data: dict) -> dict:
 
 
 def parse_wp_comment(text: str) -> dict | None:
-    """Try to extract wp_comment JSON from LLM output."""
+    """Extract wp_comment JSON from Hermes output."""
     json_pattern = re.search(r'\{.*"wp_comment".*\}', text, re.DOTALL)
     if json_pattern:
         try:
@@ -241,6 +136,30 @@ def parse_wp_comment(text: str) -> dict | None:
         except json.JSONDecodeError:
             pass
     return None
+
+
+def ensure_real_source_paths(parsed: dict, rag_results: list[dict]) -> dict:
+    """Replace LLM-generated index numbers with real NAS file paths."""
+    if not rag_results:
+        return parsed
+    wpc = parsed.get("wp_comment", {})
+    existing = wpc.get("source_docs", [])
+    has_real_paths = any(
+        (isinstance(d, str) and "/" in d)
+        or (isinstance(d, dict) and "/" in d.get("file", ""))
+        for d in existing
+    )
+    if not has_real_paths:
+        wpc["source_docs"] = [
+            {
+                "file": r.get("source_file", ""),
+                "score": r.get("score", 0),
+                "excerpt": r.get("text", "")[:200],
+            }
+            for r in rag_results[:3]
+        ]
+        parsed["wp_comment"] = wpc
+    return parsed
 
 
 @app.route("/v1/models", methods=["GET"])
@@ -271,7 +190,7 @@ def chat_completions():
     metadata = extract_metadata(data)
     wp_list = data.get("wp_list", "")
 
-    # Layer 1: Qdrant RAG search using email subject as query
+    # Layer 1: Qdrant RAG
     search_query = metadata.get("subject", "")
     if not search_query.strip():
         for msg in reversed(messages):
@@ -280,86 +199,53 @@ def chat_completions():
                 break
     rag_results = _run_rag_search(search_query, top=5)
 
-    prompt = build_ra_prompt(messages, metadata, rag_results, wp_list=wp_list)
+    context = build_context(messages, metadata, rag_results, wp_list)
 
+    # PRIMARY: Nous Hermes Agent with ra-expert skill
     response_text = ""
-    errors = []
-
-    # Primary: GLM-4-Air
-    if GLM_API_KEY:
-        try:
-            response_text = _call_glm_direct(prompt)
-        except Exception as e:
-            errors.append(f"GLM: {e}")
-
-    # Fallback: OpenRouter
-    if not response_text and OPENROUTER_API_KEY:
-        try:
-            response_text = _call_openrouter_direct(prompt)
-        except Exception as e:
-            errors.append(f"OpenRouter: {e}")
-
-    # Last resort: hermes -z with RA Expert Skill
-    if not response_text:
-        try:
-            result = subprocess.run(
-                [HERMES_BIN, "-z", prompt, "--skills", "ra-expert"],
-                capture_output=True,
-                text=True,
-                timeout=TIMEOUT,
-                env={**os.environ, "PYTHONUNBUFFERED": "1"},
-            )
-            response_text = result.stdout.strip()
-            if not response_text and result.stderr:
-                errors.append(f"hermes: {result.stderr.strip()[:200]}")
-        except subprocess.TimeoutExpired:
-            errors.append("hermes -z timeout")
-        except Exception as e:
-            errors.append(f"hermes: {e}")
+    error_detail = ""
+    try:
+        result = subprocess.run(
+            [HERMES_BIN, "-z", context, "--skills", "ra-expert"],
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        )
+        response_text = result.stdout.strip()
+        if not response_text and result.stderr:
+            error_detail = result.stderr.strip()[:500]
+    except subprocess.TimeoutExpired:
+        error_detail = f"hermes -z timeout after {TIMEOUT}s"
+    except FileNotFoundError:
+        error_detail = f"hermes binary not found: {HERMES_BIN}"
+    except Exception as e:
+        error_detail = str(e)
 
     if not response_text:
-        response_text = json.dumps({
+        content = json.dumps({
             "wp_comment": {
                 "email_type": "액션필요",
+                "matched_wp_id": None,
                 "wp_title": f"[오류] {metadata.get('subject', '이메일 처리 실패')}",
-                "summary": "모든 LLM 호출이 실패했습니다.",
+                "summary": "Hermes Agent 호출에 실패했습니다. 서버 로그를 확인하세요.",
                 "market_analysis": {"mfds": None, "ce_mdr": None, "fda": None},
                 "source_docs": [],
-                "recommendation": f"서버 로그 확인. 오류: {'; '.join(errors[:3])}",
+                "recommendation": f"hermes 서비스 상태 확인: journalctl -u hermes-api-server. 오류: {error_detail}",
                 "confidence": "low",
                 "deadline": None,
                 "product": None,
                 "org": None,
-                "flags": ["all_llm_failed"],
+                "flags": ["hermes_failed"],
             }
-        })
-
-    # Ensure source_docs contains real NAS file paths (not LLM-generated index numbers)
-    parsed = parse_wp_comment(response_text)
-    if parsed and rag_results:
-        wpc = parsed.get("wp_comment", {})
-        existing = wpc.get("source_docs", [])
-        # Validate: check if any entry has a real file path (contains "/")
-        has_real_paths = any(
-            (isinstance(d, str) and "/" in d)
-            or (isinstance(d, dict) and "/" in d.get("file", ""))
-            for d in existing
-        )
-        if not has_real_paths:
-            wpc["source_docs"] = [
-                {
-                    "file": r.get("source_file", ""),
-                    "score": r.get("score", 0),
-                    "excerpt": r.get("text", "")[:200],
-                }
-                for r in rag_results[:3]
-            ]
-            parsed["wp_comment"] = wpc
-        content = json.dumps(parsed, ensure_ascii=False)
-    elif parsed:
-        content = json.dumps(parsed, ensure_ascii=False)
+        }, ensure_ascii=False)
     else:
-        content = response_text
+        parsed = parse_wp_comment(response_text)
+        if parsed:
+            parsed = ensure_real_source_paths(parsed, rag_results)
+            content = json.dumps(parsed, ensure_ascii=False)
+        else:
+            content = response_text
 
     return jsonify({
         "id": f"chatcmpl-hermes-{int(time.time())}",
@@ -374,9 +260,9 @@ def chat_completions():
             }
         ],
         "usage": {
-            "prompt_tokens": len(prompt.split()),
+            "prompt_tokens": len(context.split()),
             "completion_tokens": len(content.split()),
-            "total_tokens": len(prompt.split()) + len(content.split()),
+            "total_tokens": len(context.split()) + len(content.split()),
         },
     })
 
