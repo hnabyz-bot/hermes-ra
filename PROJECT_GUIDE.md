@@ -71,10 +71,11 @@ n8n과 OpenProject는 **rpi5p**에서 운영된다.
 |------|------|
 | `scripts/nas_scanner.py` | rpi5p n8n PostgreSQL 전용 — T3610 배포 제외 |
 | `scripts/ra_analyze.py` | Ollama 직접 호출 — `hermes -z` + RA Expert Skill로 대체됨 |
+| `scripts/ra_api_server.py` | rpi5p 3-model cascade, T3610에서 미사용 (2026-05-26 삭제) |
 | `hermes-oauth-gateway/` | rpi5p 3-model gateway 아카이브 |
 | `hermes-ra-api/` | rpi5p v5.2 Triple Model 아카이브 |
-| `ra_api_server.py` | 루트의 rpi5p Python API 서버 |
-| `ops/scripts/ra_api_server.py` | 이전 운영 스크립트 |
+| `ra_api_server.py` | 루트의 rpi5p Python API 서버 (2026-05-26 삭제) |
+| `ops/scripts/ra_api_server.py` | 이전 운영 스크립트 (2026-05-26 삭제) |
 
 레거시 파일은 마이그레이션 검증이나 아카이브 정리 목적이 아니면 수정하지 않는다.
 
@@ -149,7 +150,6 @@ hermes -z "MFDS 의료기기 소프트웨어 허가 요건을 간략히 알려�
 실제 환경 파일은 `/opt/hermes-ra/.env`에 둔다. 저장소에는 예시 파일만 둔다.
 
 ```bash
-GLM_API_KEY=sk_xxxxx
 OPENPROJECT_API_KEY=xxxxx
 OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 QDRANT_URL=http://localhost:6333

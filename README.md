@@ -135,7 +135,6 @@ nano /opt/hermes-ra/.env
 필수 키:
 
 ```bash
-GLM_API_KEY=sk_xxxxx
 OPENPROJECT_API_KEY=xxxxx
 OPENPROJECT_BASE_URL=https://plm.abyz-lab.work
 QDRANT_URL=http://localhost:6333
@@ -353,15 +352,17 @@ hermes-ra/
 └── HERMES_RA_PHILOSOPHY.md           ← 운영 철학
 ```
 
-### LEGACY 파일 (rpi5p 아카이브)
+### LEGACY 파일 (rpi5p 아카이브, 2026-05-26 정리)
 
 | 경로 | 이유 |
 |------|------|
 | `scripts/nas_scanner.py` | rpi5p PostgreSQL 전용 |
 | `scripts/ra_analyze.py` | `hermes -z`로 대체됨 |
+| `scripts/ra_api_server.py` | rpi5p 3-model cascade, T3610에서 미사용 (삭제: 2026-05-26) |
 | `hermes-oauth-gateway/` | rpi5p 3-model gateway |
 | `hermes-ra-api/` | rpi5p v5.2 Triple Model |
-| `ra_api_server.py` (루트) | rpi5p Python API 서버 |
+| `ra_api_server.py` (루트) | rpi5p Python API 서버 (삭제: 2026-05-26) |
+| `ops/scripts/ra_api_server.py` | 이전 운영 스크립트 (삭제: 2026-05-26) |
 
 ---
 
