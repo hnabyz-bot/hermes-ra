@@ -240,8 +240,8 @@ memory:
 model:
   api_mode: chat_completions
   base_url: ''
-  default: glm-4.5-air
-  provider: zai
+  default: gpt-5.5
+  provider: openai-codex
 model_catalog:
   enabled: true
   providers: {}

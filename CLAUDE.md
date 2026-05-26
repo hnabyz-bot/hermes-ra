@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **[2026-05-11 AI 엔진 전환 선언]**
 > T3610 서버의 Hermes RA Agent AI 엔진은 **Nous Research Hermes Agent v0.13.0** 으로 전환되었다.
-> `hermes-oauth-gateway/`, `hermes-ra-api/`, `ops/scripts/ra_api_server.py` 는 rpi5p 아카이브이며
+> `hermes-oauth-gateway/`, `hermes-ra-api/` 는 rpi5p 아카이브이며
 > T3610에서는 사용하지 않는다.
 
 ---
@@ -157,7 +157,7 @@ sudo bash ops/scripts/setup_new_pc.sh --restore-snapshot ~/.hermes/snapshots/res
 | `scripts/ra_analyze.py` | Ollama 직접 호출 (hermes -z로 대체됨) | **LEGACY** |
 | `hermes-oauth-gateway/` | rpi5p 3-model 게이트웨이 | **LEGACY** |
 | `hermes-ra-api/` | rpi5p v5.2 Triple Model | **LEGACY** |
-| `ra_api_server.py` (루트) | rpi5p Python API 서버 | **LEGACY** |
+| `ra_api_server.py` (루트, scripts/, ops/scripts/) | rpi5p Python API 서버 | **삭제됨** (2026-05-26) |
 
 ---
 
