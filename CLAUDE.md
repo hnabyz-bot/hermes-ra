@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## [MISSION — 절대 잊지 말 것]
+
+> **T3610의 Hermes는 지구최강의 의료기기 RA 전문가로 성장해야 한다.**
+
+- Hermes는 H&abyz의 전속 RA 전문가다. 보조 도구가 아니다.
+- n8n, OpenProject는 Hermes의 전문성을 소비하는 클라이언트다. Hermes의 정체성이 아니다.
+- 이 저장소의 모든 작업은 **Hermes의 RA 전문성 향상**을 위한 것이어야 한다.
+- 인프라 개선(API 서버, 인덱서)은 Hermes가 더 잘 성장하도록 지원하는 역할이다. 목적 그 자체가 아니다.
+
+**성장 경로:**
+1. `skills/ra-expert/SKILL.md` — RA 지식과 판단 기준을 깊게 쌓는다
+2. `skills/ra-expert/references/` — 규정 원문 요약을 풍부하게 한다
+3. NAS Qdrant RAG — 회사 실제 사례를 Hermes가 인용할 수 있게 한다
+4. `ra-project/` + `MD-process/` — 사내 규정·절차를 Hermes 지식으로 흡수시킨다
+
+**목표 이탈 경보:** 아래 상황이 발생하면 즉시 멈추고 이 섹션을 다시 읽는다.
+- 새로운 LLM을 연동하거나 fallback 체인을 만들려는 충동
+- hermes-api-server.py에 RA 판단 로직을 추가하려는 충동
+- n8n/OP 파이프라인 개선이 주목적이 되는 상황
+- Hermes TUI 대신 외부 API 호출로 RA 분석을 처리하는 상황
+
+---
+
 > **[2026-05-11 AI 엔진 전환 선언]**
 > T3610 서버의 Hermes RA Agent AI 엔진은 **Nous Research Hermes Agent v0.13.0** 으로 전환되었다.
 > `hermes-oauth-gateway/`, `hermes-ra-api/` 는 rpi5p 아카이브이며
@@ -11,8 +36,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-의료기기 규제 인허가(RA) 업무를 전문가 수준으로 처리하는 AI 에이전트.
-**보조 도구가 아닌 전문 에이전트**로서, RA 담당자의 판단 부담을 극소화하는 것이 목표다.
+T3610의 Hermes를 **지구최강 의료기기 RA 전문가**로 성장시키는 프로젝트.
+
+- MFDS(한국), CE MDR(EU), FDA(미국) 3개 시장을 커버하는 전문가 수준 판단 능력
+- H&abyz 사내 규정, NAS 문서, 글로벌 규제 원문을 모두 아우르는 지식 체계
+- RA 담당자가 판단을 위임할 수 있는 신뢰 가능한 전문가 에이전트
 
 ---
 
@@ -196,6 +224,19 @@ rpi5p 서비스: n8n (:5678), OpenProject (plm.abyz-lab.work)
 
 이 규칙들은 매 작업 시작 전 반드시 확인한다. 위반 시 즉시 중단하고 수정한다.
 
+### [HARD-0] 미션 — Hermes는 지구최강 RA 전문가로 성장해야 한다
+
+**이 프로젝트의 존재 이유는 단 하나다: T3610의 Hermes를 의료기기 RA 분야에서 세계 최고 수준의 전문가로 성장시키는 것.**
+
+- Hermes는 특정 파이프라인(n8n→OP)의 부품이 아니다. n8n과 OP는 클라이언트 중 하나다
+- Hermes는 TUI에서 직접 질의해도 세계 최고 수준의 RA 분석을 내놓아야 한다
+- 모든 작업의 최종 판단 기준: "이 작업이 Hermes의 RA 전문성을 향상시키는가?"
+  - YES → 진행
+  - NO, 인프라 유지보수 → 최소한으로, RA 전문성에 방해되지 않는 범위에서
+  - NO, 새 파이프라인/연동 → 중단하고 미션 재확인
+
+**Hermes의 성장 = SKILL.md + references/ + 지식베이스(ra-project, MD-process) + NAS RAG 고도화**
+
 ### [HARD-1] Nous Hermes Agent는 PRIMARY 엔진이다
 
 **Nous Research Hermes Agent v0.13.0 (`hermes -z --skills ra-expert`)는 항상 PRIMARY 호출 대상이다.**
@@ -256,6 +297,11 @@ result = subprocess.run(["hermes", "-z", context, "--skills", "ra-expert"])  # p
 
 **위반 내용**: GLM-4-Air primary, hermes last resort. `build_ra_prompt()`가 SKILL.md 분류 로직을 Python에 중복.
 **수정 내용**: GLM/OpenRouter 전면 제거. `hermes -z --skills ra-expert` 단독 primary. `build_context()`로 축소(메타데이터+RAG만). 이메일 분류 규칙을 SKILL.md로 이전.
+
+### [수정완료 2026-05-26] SKILL.md — Hermes를 파이프라인 부품으로 앵커링
+
+**위반 내용**: SKILL.md가 `Always produce a JSON response (wp_comment)` 강제. frontmatter에 "produces wp_comment JSON for OpenProject" 명시. Hermes가 TUI 직접 질의에도 OP 댓글 봇처럼 행동.
+**수정 내용**: Response Mode Detection 추가. Mode A(기본, 전문가 자연어 분석) / Mode B(파이프라인 컨텍스트 감지 시 wp_comment JSON) 분리. Hermes 정체성을 RA 전문가로 재정의. frontmatter에서 OP 고정 문구 제거.
 
 ---
 
