@@ -14,6 +14,7 @@ RA classification rules and output format are defined in SKILL.md, not here.
 """
 
 import json
+import logging
 import os
 import re
 import subprocess
@@ -30,6 +31,32 @@ HERMES_MAX_TOKENS = int(os.environ.get("HERMES_MAX_TOKENS", "4096"))
 PORT = int(os.environ.get("API_SERVER_PORT", "8643"))
 TIMEOUT = int(os.environ.get("HERMES_TIMEOUT", "120"))
 RAG_TIMEOUT = int(os.environ.get("RAG_TIMEOUT", "60"))
+
+# Response log for weekly_review.py analysis
+RESPONSE_LOG = os.environ.get("RESPONSE_LOG", "/var/log/hermes-responses.jsonl")
+
+_response_logger = logging.getLogger("hermes.responses")
+_response_logger.setLevel(logging.INFO)
+try:
+    _fh = logging.FileHandler(RESPONSE_LOG)
+    _fh.setFormatter(logging.Formatter("%(message)s"))
+    _response_logger.addHandler(_fh)
+except OSError:
+    pass  # log dir not writable; skip silently
+
+
+def log_response(metadata: dict, parsed: dict) -> None:
+    """Append one JSONL line per processed request for quality review."""
+    try:
+        record = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "subject": metadata.get("subject", ""),
+            "sender": metadata.get("sender", ""),
+            "wp_comment": parsed.get("wp_comment", parsed),
+        }
+        _response_logger.info(json.dumps(record, ensure_ascii=False))
+    except Exception:
+        pass
 
 # Layer 1: Qdrant RAG
 RAG_SCRIPT = os.environ.get("RAG_SCRIPT", "/opt/hermes-ra/skills/ra-expert/scripts/rag_search.py")
@@ -244,6 +271,7 @@ def chat_completions():
         if parsed:
             parsed = ensure_real_source_paths(parsed, rag_results)
             content = json.dumps(parsed, ensure_ascii=False)
+            log_response(metadata, parsed)
         else:
             content = response_text
 

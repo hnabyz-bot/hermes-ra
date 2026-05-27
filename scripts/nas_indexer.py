@@ -46,6 +46,13 @@ SCAN_PATHS = [
     "/mnt/nas-ra/공통자료/RA/52_컨설팅/",
     "/mnt/nas-ra/공통자료/RA/★User Manual/",
     "/mnt/nas-ra/공통자료/RA/★Label/",
+    # 2026-05-26 추가: 누락된 핵심 RA 경로
+    "/mnt/nas-ra/공통자료/RA/01_DHF/",
+    "/mnt/nas-ra/공통자료/RA/04_제품별 인허가 진행 문서/",
+    "/mnt/nas-ra/공통자료/RA/05_해외 등록 서류 (영업팀 F-up)/",
+    "/mnt/nas-ra/공통자료/RA/20_FDA Guidance/",
+    "/mnt/nas-ra/공통자료/RA/20_국내 고시 및 동향/",
+    "/mnt/nas-ra/공통자료/RA/21_국가별 인증/",
 ]
 
 SUPPORTED_EXTS = {".pdf", ".docx", ".doc", ".pptx", ".xlsx"}
@@ -145,7 +152,7 @@ def embed(text):
     data = json.dumps({"model": model, "prompt": text}).encode()
     req = urllib.request.Request(OLLAMA_EMBED_URL, data=data,
                                   headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:
         return json.loads(resp.read())["embedding"]
 
 

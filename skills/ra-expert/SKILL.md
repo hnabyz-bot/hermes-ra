@@ -36,7 +36,7 @@ Every response must cite actual source documents (filename + excerpt) that suppo
 
 - **Company name**: H&abyz (also written as H&ABYZ, H&abyz)
 - **Legal entity**: abyz-lab
-- **Business**: Medical imaging device manufacturer — primary product line is X-ray based diagnostic imaging equipment (detectors, digital X-ray systems)
+- **Business**: Medical imaging device manufacturer — X-ray based diagnostic imaging equipment
 - **Internal email domain**: @abyzr.com (e.g., drake.lee@abyzr.com, any @abyzr.com sender = internal staff)
 - **External domains**: All other domains = external parties (customers, vendors, regulators, distributors)
 
@@ -45,6 +45,84 @@ Every response must cite actual source documents (filename + excerpt) that suppo
 - Emails ABOUT "H&abyz" products = company's own products → match against active RA WPs (product registration, approvals, audits)
 - Subject containing "H&abyz" or "H&ABYZ" = typically about the company's own business, NOT an external vendor introduction
 - When an email references "H&abyz" as the sender/subject company, do NOT treat H&abyz as an unknown external party
+
+---
+
+## H&abyz 제품 포트폴리오 및 규제 분류 (CRITICAL)
+
+### 제품군 1 — X-ray Detector (평판 검출기)
+
+| 모델 | 특징 |
+|------|------|
+| HAD1717MC | 17×17" 다목적 검출기 |
+| HAD1717MG | 그리드 통합형 |
+| ADD 시리즈 — HAD1417MCW / HAD1717MCW | 무선(Wireless) 검출기 |
+| Blue 시리즈 — G1417MCW 계열 | 소형 경량 무선 |
+| CYAN | 고성능 컬러 플랫 패널 |
+
+**규제 분류:**
+- MFDS: 2등급 인증 (의료기기)
+- FDA: Class II, Product Code **MQB** (21 CFR 892.1680/892.1720), 510(k) 경로
+- CE MDR: **Class IIa** (Annex VIII Rule 10 — X-ray를 수동 수신하는 검출기)
+
+**핵심 성능 표준 (필수):**
+- IEC 62220-1-1:2015 — DQE (Detective Quantum Efficiency) 측정
+- IEC 60601-1 Ed.3.2 — 전기안전
+- IEC 60601-1-3:2008+AMD1+AMD2 — 방사선 방호
+
+### 제품군 2 — Handheld X-ray Source (소형 X-ray 발생장치)
+
+| 모델 | 특징 |
+|------|------|
+| HnX-P1 | 기본형 핸드헬드 X-ray |
+| HnX-PB | 배터리 강화형 |
+
+**규제 분류:**
+- MFDS: 2등급 + **진단용 방사선 발생장치 안전관리 규칙** 병행 적용 (의료법 제37조)
+- FDA: Class II, Product Codes **IZL / EAF**, 510(k) + **21 CFR Part 1020.30-1020.33** 필수 적용
+  - Form FDA 2877 (수입 시 Initial Import Report)
+  - Form FDA 2579 (Report of Assembly)
+- CE MDR: **Class IIb** (Annex VIII Rule 10 — 이온화 방사선 능동 발생 기기)
+
+**핵심 성능 표준 (필수):**
+- IEC 60601-2-28:2017 — X-ray Source 전용 표준
+- IEC 60601-1-3 — 방사선 방호
+- IEC 60601-1 Ed.3.2 — 전기안전
+
+### 제품군 3 — 촬영실 GUI SW (Medical Imaging Software)
+
+| 모델 | 특징 |
+|------|------|
+| HnVUE | 영상 획득·처리·표시 GUI SW |
+| Retrofit (HnX-R1) | 기존 아날로그 시스템 디지털화 키트 |
+
+**규제 분류:**
+- MFDS: 2등급 + **디지털의료제품법 (2025-01-24 시행)** 검토 필요
+- FDA: Class II, Product Codes **LLZ / QIH**, 510(k) + Cybersecurity (FD&C Act §524B)
+- CE MDR: **Class IIa~IIb** (Annex VIII Rule 11 — SaMD 분류)
+  - MDCG 2019-11 Rev.1 (2025-06): AI 기반 영상 평가 SW → 항상 MDSW 분류
+
+### IEC 62304 Safety Class 맵핑 (3제품)
+| 제품 | Safety Class | 근거 |
+|------|-------------|------|
+| X-ray Detector 펌웨어 | **Class B** | 오작동 시 중상해 가능 |
+| HnX-P1/PB 제어 SW | **Class C** | X-ray 발생 직접 제어, 방사선 과다 노출 위험 |
+| HnVUE / Retrofit SW | **Class C** | 진단 결과에 직접 영향 |
+
+---
+
+## 긴급 규제 캘린더 (CRITICAL — 반드시 확인)
+
+| 항목 | 시한 | 영향 제품 | 상태 |
+|------|------|---------|------|
+| **EUDAMED UDI 의무 등록** | **2026-05-28** | CE MDR 전 제품 | 긴급 — 내일 마감 |
+| MDR 전환 Class III implantable | 2026-05-26 | 해당없음 (H&abyz 비이식형) | — |
+| MDR 전환 IIb non-impl/IIa | **2028-12-31** | HnX-P1/PB (IIb), Detector (IIa), HnVUE (IIa~IIb) | 조건 확인 필요 |
+| FDA QMSR 시행 | **2026-02-02** (이미 발효) | 전 제품 | QMS ISO 13485 정합화 완료 여부 확인 |
+| MFDS 디지털의료제품법 | **2025-01-24** (시행) | HnVUE, Retrofit | 적용 범위 검토 완료 여부 확인 |
+| MFDS 진단용 방사선 발생장치 규칙 개정 | 2025-07-18 발효 | HnX-P1/PB | 3년 주기 정기검사·신고 의무 영향 확인 |
+
+**EUDAMED UDI 2026-05-28 대응**: CE MDR 제품(Detector IIa, HnX-P1/PB IIb, HnVUE IIa~IIb) 모두 EUDAMED UDI/Device 모듈에 Basic UDI-DI 및 UDI-DI 등록이 2026-05-28까지 의무화. 미등록 시 EU 시장 출하 불가.
 
 ---
 
@@ -82,16 +160,40 @@ If Qdrant is unreachable, note it and continue with Layers 2–3.
 ### Layer 2: ra-project (Curated Regulatory Knowledge Base)
 
 Structured markdown KB covering MFDS/CE MDR/FDA regulatory requirements.
-Path: `/home/abyz-lab/work/workspace-github/holee9/ra-project/`
+Base: `/home/abyz-lab/work/workspace-github/holee9/ra-project/`
 
-Key directories:
-- `01_규제지식베이스/` — regulatory requirements by market
-- `02_제품별_기술파일/` — product-specific technical file guides
-- `03_진행현안/` — ongoing regulatory issues
-- `04_기술문서_템플릿/` — document templates
-- `06_심사_QA이력/` — regulatory review Q&A history
+**Query routing by topic** (read these files directly for authoritative content):
 
-Use MCP filesystem to search: read relevant markdown files for authoritative regulatory text.
+| 질의 유형 | 파일 경로 |
+|---------|---------|
+| 3지역 규제 비교 총괄 | `01_규제지식베이스/규제_프레임워크_요약.md` |
+| MFDS 국내 허가 전체 | `01_규제지식베이스/국내_MFDS/MFDS_인허가_상세가이드.md` |
+| FDA 510(k) 전체 | `01_규제지식베이스/미국_FDA/FDA_인허가_상세가이드.md` |
+| MDR 전체 | `01_규제지식베이스/유럽_CE_MDR/MDR_인허가_상세가이드.md` |
+| eSTAR 작성 (기기설명/IFU) | `01_규제지식베이스/미국_FDA/510k_PMA_가이던스/eSTAR_01_Device_Description_IFU.md` |
+| eSTAR SE 비교 | `01_규제지식베이스/미국_FDA/510k_PMA_가이던스/eSTAR_02_Substantial_Equivalence.md` |
+| eSTAR 성능시험 | `01_규제지식베이스/미국_FDA/510k_PMA_가이던스/eSTAR_03_Performance_Testing_Bench_Test.md` |
+| eSTAR Cybersecurity | `01_규제지식베이스/미국_FDA/510k_PMA_가이던스/eSTAR_04_Cybersecurity_Section.md` |
+| eSTAR Software | `01_규제지식베이스/미국_FDA/510k_PMA_가이던스/eSTAR_05_Software_Section.md` |
+| eSTAR Labeling | `01_규제지식베이스/미국_FDA/510k_PMA_가이던스/eSTAR_06_Labeling_IFU_Form3881.md` |
+| FDA AI/ML PCCP | `01_규제지식베이스/미국_FDA/PCCP_AI_Device_작성가이드.md` |
+| FDA Pre-Sub (Q-Sub) | `01_규제지식베이스/미국_FDA/510k_PMA_가이던스/FDA_PreSubmission_QSub_가이드.md` |
+| FDA RTA 회피 | `01_규제지식베이스/미국_FDA/FDA_RTA_Refuse_to_Accept_회피_체크리스트.md` |
+| QMSR/ISO13485 비교 | `01_규제지식베이스/국제표준_IEC_ISO/KGMP_QMSR_ISO13485_비교_통합전략.md` |
+| IEC 62304 SW | `01_규제지식베이스/국제표준_IEC_ISO/IEC62304_SW수명주기_산출물_매핑.md` |
+| UDI 3지역 비교 | `01_규제지식베이스/UDI_구조_3지역_비교.md` |
+| IFU 3지역 비교 | `01_규제지식베이스/IFU_필수요소_3지역_비교.md` |
+| 사이버보안 통합 | `01_규제지식베이스/사이버보안_통합가이드.md` |
+| MDR GSPR 체크리스트 | `01_규제지식베이스/유럽_CE_MDR/MDR_2017_745/MDR_AnnexI_GSPR_Checklist.md` |
+| Detector DHF 목차 | `02_제품별_기술파일/01_Xray_Detector/Xray_Detector_DHF_목차_템플릿.md` |
+| Detector 성능시험 | `02_제품별_기술파일/01_Xray_Detector/Xray_Detector_성능시험_매트릭스.md` |
+| DQE 측정 가이드 | `02_제품별_기술파일/01_Xray_Detector/IEC62220-1-1_DQE_측정절차_가이드.md` |
+| IEC 60601-1 시험 매트릭스 | `01_규제지식베이스/국제표준_IEC_ISO/IEC60601-1_Ed3.2_시험항목_매트릭스.md` |
+| IEC 60601-1-3 방사선 방호 | `01_규제지식베이스/국제표준_IEC_ISO/IEC60601-1-3_방사선방호_시험항목_매트릭스.md` |
+| 빈번 지적사항 Top 20 | `01_규제지식베이스/3지역_공통_빈번지적사항_Top20.md` |
+| 진행 과제 현황 | `03_진행현안/과제_관리대장.md` |
+
+Use Read tool to access these files directly when the query matches.
 
 ### Layer 3: MD-process (QMS / SOP Knowledge Base)
 
@@ -352,16 +454,79 @@ Software functions to be regulated as a device (FDARA Section 520(o)):
 - Included: diagnosis/cure/treat/prevent/mitigate disease or condition
 - Software as Medical Device: follows IMDRF SaMD framework + risk categorization
 
-### QSR — 21 CFR Part 820 (현재 QMSR로 전환 중)
+### QMSR — 21 CFR Part 820 (2026-02-02 이미 발효)
 
-현재(2026년): Quality System Regulation (QSR) 21 CFR Part 820 유효
-전환: FDA QMSR (ISO 13485:2016 harmonized) — 2024-02-02부터 시행
+**FDA QMSR (Quality Management System Regulation)**: ISO 13485:2016 정합 (incorporation by reference)
+- 2024년 공표 → 2년 전환기간 → **2026-02-02 시행 (이미 발효)**
+- QSIT 폐기 → 새 검사 프로그램 **7382.850** 사용
+- ISO 13485 인증이 있어도 FDA 검사 **면제되지 않음**
+- H&abyz 대응: QMS 문서 전체를 ISO 13485:2016 정합 형식으로 업데이트 필요
 
 핵심 서브파트:
 - 820.30: Design Controls (필수 — 설계 입력/출력/검토/검증/유효성확인/이관)
 - 820.100: CAPA
 - 820.200: Servicing
 - 820.250: Statistical Techniques
+
+---
+
+## X-ray 기기 특화 규제 (H&abyz 핵심)
+
+### MFDS — 진단용 방사선 발생장치 안전관리
+
+**근거**: 의료법 제37조, 「진단용 방사선 발생장치의 안전관리에 관한 규칙」 (보건복지부령 제1122호, 2025-07-18 최종 개정)
+
+- 적용 대상: HnX-P1/PB (X-ray Source 제품군)
+- 의료기기법 허가 외에 **별도 안전관리 신고 의무** 병행
+- 설치 의료기관이 사용 개시 **3일 전 신고**
+- **3년 주기 정기 안전검사** (검사기관: 한국의료기기안전정보원 등)
+- 안전관리책임자 임명 의무 (의료기관 내)
+- X-ray Detector(HAD, ADD, Blue, CYAN)는 발생장치가 아니므로 이 규칙 **비적용** — 의료기기법 허가만 필요
+
+### FDA — 21 CFR Part 1020 Radiation Control Standards
+
+**근거**: FD&C Act §531-542, 21 CFR Part 1020.30~1020.33 (Performance Standards for Diagnostic X-ray Systems)
+
+**적용 제품**: HnX-P1/PB — 510(k) 외에 반드시 병행 준수 필요
+
+| 조항 | 내용 |
+|------|------|
+| **1020.30** | 일반 요건 — 정의, 레코드 유지 |
+| **1020.31** | Fluoroscopic equipment (투시 장비) 성능 요건 |
+| **1020.32** | Diagnostic X-ray systems (일반 진단용) |
+| **1020.33** | Computed tomography (CT) — X-ray Source 포함 시 적용 검토 |
+
+**신고 의무:**
+- **Form FDA 2877** (Initial Import/Assembly Report): 수입·조립 시 신고
+- **Form FDA 2579** (Report of Assembly): 2023년 개정(88 FR 3638)으로 일부 부속 컴포넌트 제출 의무 완화됨
+- Annual Establishment Registration + Device Listing 의무 (21 CFR Part 807)
+
+**X-ray Detector (HAD/ADD/Blue/CYAN)**: 방사선 발생 장치가 아니므로 21 CFR Part 1020 **비적용** — 510(k) Product Code MQB 경로
+
+### CE MDR — Rule 10 X-ray 분류 세부 적용
+
+**Annex VIII Rule 10 핵심 판단 기준:**
+
+```
+이온화 방사선을 "능동적으로 발생"시키는가?
+  YES → Class IIb (X-ray Source: HnX-P1/PB)
+  NO (수동 수신) → Class IIa (X-ray Detector: HAD, ADD, Blue, CYAN, CYAN)
+```
+
+- **"specifically intended for recording of diagnostic images generated by X-ray radiation"** → Class IIa 적용 근거
+- GUI SW (HnVUE, Retrofit): Rule 11 SaMD 분류 → IIa~IIb (AI 기능 유무에 따라 달라짐)
+- MDCG 2019-11 Rev.1 (2025-06): AI 기반 영상 분석 SW → 항상 MDSW로 분류, 최소 IIa
+
+### 핵심 X-ray 전용 표준 (시험 필수)
+
+| 표준 | 적용 제품 | 시험 핵심 |
+|------|---------|---------|
+| IEC 62220-1-1:2015 | X-ray Detector (전 모델) | DQE, MTF, NNPS — 검출기 성능 핵심 지표 |
+| IEC 60601-2-54:2022 (Ed 2.0) | 촬영·투시 시스템 전반 | 2009 1판 + AMD 완전 대체 |
+| IEC 60601-2-28:2017 (Ed 3.0) | X-ray Source (HnX-P1/PB) | X-ray Source 전용 |
+| IEC 60601-1-3:2008+AMD1+AMD2 | X-ray 전 제품 | 방사선 방호 — 누설방사선, HVL, 콜리메이터, Focal Spot |
+
+**MFDS vs FDA 방사선 방호 차이**: IEC 60601-1-3 해석에서 누설방사선 한계값이 MFDS(0.88 mGy/h @ 1m)와 FDA 간 미세 차이 존재 → 시험 보고서에 양쪽 기준 모두 명시 필요
 
 ---
 
