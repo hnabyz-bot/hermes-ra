@@ -1,8 +1,9 @@
 # Hermes RA 프로젝트 진행 지침서
 
-> 작성일: 2026-05-22 | 최종 개정: 2026-05-22
+> 작성일: 2026-05-22 | 최종 개정: 2026-05-27
 > 기준 저장소: [hnabyz-bot/hermes-ra](https://github.com/hnabyz-bot/hermes-ra)
-> 현재 엔진: Nous Research Hermes Agent v0.13.0 on T3610
+> 현재 엔진: Nous Research Hermes Agent v0.14.0 on T3610
+> LLM: qwen3:30b (GX10 NVIDIA GB10 GPU, ollama_num_ctx: 65536)
 > 지식소스: NAS Qdrant (Docker) + ra-project + MD-process (3계층)
 
 이 문서는 작업을 시작할 때 빠르게 기준을 맞추기 위한 진행 지침서다. 상세 운영 설명은 `README.md`, Claude Code 작업 규칙은 `CLAUDE.md`, 운영 철학은 `HERMES_RA_PHILOSOPHY.md`를 우선한다.
@@ -16,7 +17,7 @@
     -> n8n ra-request-to-op_v5 (rpi5p:5678), 1분 폴링
     -> hermes-api-server :8643 (/opt/hermes-ra/hermes-api-server.py)
          메일 메타데이터 파싱 + 리치 컨텍스트 빌드
-         -> Nous Hermes Agent v0.13.0 (hermes -z)
+         -> Nous Hermes Agent v0.14.0 (hermes -z)
               ~/.hermes/skills/ra-expert/ (MFDS/CE MDR/FDA) — 3계층 검색 지침 포함
               -> [Layer 1] Qdrant :6333 nas_ra_docs RAG (Docker, qwen3-embedding:latest)
               -> [Layer 2] ra-project 규제 지식베이스 (MCP filesystem)
@@ -37,9 +38,11 @@
 | 노드 | 역할 | 2.5G 직결 | LAN | Tailscale |
 |------|------|-----------|-----|-----------|
 | T3610 | Hermes RA 메인 서버 | 192.168.100.200 | 10.20.6.140 | 100.119.79.28 |
-| GX10 | AI 컴퓨팅 노드 | 192.168.100.1 | 10.20.6.141 | 100.78.1.7 |
+| GX10 | AI 컴퓨팅 노드 (NVIDIA GB10 GPU) | 192.168.100.1 | 10.20.6.141 | 100.78.1.7 |
 
-GX10은 Ollama `:11434`, Portainer `:9000`을 담당한다. GX10과의 통신은 2.5G 직결망을 우선한다.
+GX10은 Ollama `:11434`(qwen3:30b LLM + qwen3-embedding), Portainer `:9000`을 담당한다.
+GX10 커널: `6.17.0-1018-nvidia` (NVIDIA GB10 드라이버 포함, GPU 추론 활성).
+GX10과의 통신은 2.5G 직결망을 우선한다.
 n8n과 OpenProject는 **rpi5p**에서 운영된다.
 
 ## 2. 저장소 파일 분류
@@ -132,8 +135,18 @@ for c in resp['result']['collections']:
 # 5. NAS 마운트 확인
 ls /mnt/nas-ra/ 2>/dev/null || echo "NAS 마운트 필요"
 
-# 6. Hermes oneshot 확인
-hermes -z "MFDS 의료기기 소프트웨어 허가 요건을 간략히 알려줘"
+# 6. GX10 GPU + Ollama 상태 확인 (LLM 추론 정상 여부)
+ssh gx10 "nvidia-smi --query-gpu=name,utilization.gpu --format=csv,noheader 2>/dev/null || echo 'GPU 드라이버 오류'"
+curl -s http://192.168.100.1:11434/api/ps | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+for m in d.get('models',[]): print(m['name'], m['size_vram']//1024//1024,'MB VRAM')
+" 2>/dev/null || echo "Ollama 연결 실패"
+
+# 7. Hermes config 확인 (model 섹션)
+grep -A5 '^model:' ~/.hermes/config.yaml
+
+# 8. Hermes oneshot 확인 (RA 스킬 포함)
+hermes -z "MFDS 의료기기 소프트웨어 허가 요건을 간략히 알려줘" --skills ra-expert
 ```
 
 ## 5. 개발 및 검증 규칙

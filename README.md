@@ -3,8 +3,9 @@
 [![Latest Release](https://img.shields.io/github/v/release/hnabyz-bot/hermes-ra)](https://github.com/hnabyz-bot/hermes-ra/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **[2026-05-22 T3610 운영 체제]**
-> AI 엔진: **Nous Research Hermes Agent v0.13.0**
+> **[2026-05-27 T3610 운영 체제]**
+> AI 엔진: **Nous Research Hermes Agent v0.14.0**
+> LLM: **qwen3:30b** (GX10 NVIDIA GB10 GPU 추론, ~24 tokens/sec)
 > 3계층 지식소스(NAS Qdrant RAG + ra-project + MD-process) 통합 완료.
 > 기존 rpi5p 기반 3-Model Architecture는 아카이브입니다.
 
@@ -13,19 +14,23 @@ MFDS·CE MDR·FDA 3개 시장 규제 지식과 회사 NAS 원본 문서를 결�
 
 ---
 
-## 현재 시스템 (2026-05-22 기준)
+## 현재 시스템 (2026-05-27 기준)
 
 | 항목 | 내용 |
 |------|------|
-| AI 엔진 | Nous Research Hermes Agent v0.13.0 |
+| AI 엔진 | Nous Research Hermes Agent v0.14.0 |
 | 바이너리 | `~/.local/bin/hermes` |
 | 설정 파일 | `~/.hermes/config.yaml` |
+| **LLM 모델** | `qwen3:30b` (GX10 Ollama, NVIDIA GB10 GPU, ~24 tokens/sec) |
+| **컨텍스트 윈도우** | 65,536 tokens (`model.ollama_num_ctx: 65536`) |
 | RA 스킬 경로 | `~/.hermes/skills/ra-expert/` → `/opt/hermes-ra/skills/ra-expert/` |
-| **지식소스 Layer 1** | NAS Qdrant RAG — `nas_ra_docs` 컬렉션 (Docker, `:6333`, 재인덱싱 진행 중) |
+| **지식소스 Layer 1** | NAS Qdrant RAG — `nas_ra_docs` 컬렉션 (Docker, `:6333`) |
 | **지식소스 Layer 2** | ra-project — 규제 지식베이스 (holee9/ra-project, 매일 07:00 pull) |
 | **지식소스 Layer 3** | MD-process — QMS/SOP 절차서 (holee9/MD-process, 매일 07:05 pull) |
 | 임베딩 모델 | `qwen3-embedding:latest` (GX10 Ollama, 4096차원, `/api/embed`) |
+| GX10 GPU | NVIDIA GB10 (Grace Blackwell, 128GB 통합 메모리) |
 | GX10 연결 | 2.5G 직결 (192.168.100.200 → 192.168.100.1) |
+| GX10 커널 | `6.17.0-1018-nvidia` (NVIDIA 드라이버 포함) |
 
 ---
 
@@ -65,7 +70,7 @@ RA 질의
     ├─ 리치 컨텍스트 빌드 → hermes -z "<context>"
     └─ wp_comment JSON 구조 응답 구성
          ↓
-[Nous Hermes Agent v0.13.0 (T3610)]
+[Nous Hermes Agent v0.14.0 (T3610)]
     ├── RA Expert Skill (~/.hermes/skills/ra-expert/)
     │   ├─ SKILL.md (MFDS + CE MDR 2017/745 + FDA 510(k)) — 3계층 검색 지침 포함
     │   ├─ scripts/rag_search.py (Qdrant 검색 — qwen3-embedding:latest)
@@ -77,7 +82,7 @@ RA 질의
     │     holee9/ra-project — 규제 지식베이스
     ├── [Layer 3] MD-process (~/.hermes/config.yaml MCP filesystem)
     │     holee9/MD-process — QMS/SOP 절차서
-    └── GX10 Ollama (:11434, qwen3-embedding:latest)
+    └── GX10 Ollama (:11434, qwen3:30b LLM + qwen3-embedding:latest)
          ↓
 [wp_comment JSON] → n8n (rpi5p) → OpenProject WP 댓글 등록
 ```
@@ -263,8 +268,17 @@ tail -20 /var/log/hermes-ra-sync.log
 # 2.5G 직결 (최우선)
 ssh gx10                              # → 192.168.100.1
 
+# GPU 상태 확인
+ssh gx10 "nvidia-smi --query-gpu=name,utilization.gpu --format=csv,noheader"
+
 # Ollama 모델 목록 확인
 curl -s http://192.168.100.1:11434/api/tags | python3 -c "import sys,json; [print(m['name']) for m in json.load(sys.stdin)['models']]"
+
+# 로드된 모델 및 VRAM 점유 확인
+curl -s http://192.168.100.1:11434/api/ps | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+for m in d.get('models',[]): print(m['name'], m['size_vram']//1024//1024,'MB VRAM')
+"
 
 # qwen3-embedding 동작 확인
 curl -s -X POST http://192.168.100.1:11434/api/embed \
@@ -280,7 +294,7 @@ curl -s -X POST http://192.168.100.1:11434/api/embed \
 | 노드 | 역할 | OS |
 |------|------|----|
 | **T3610** | Hermes RA 메인 서버 / Claude Code | Ubuntu 26.04 LTS |
-| **GX10** | AI 컴퓨팅 노드 (Ollama, Portainer) | Ubuntu 24.04.4 LTS (nvidia) |
+| **GX10** | AI 컴퓨팅 노드 — NVIDIA GB10 GPU (Ollama, Portainer) | Ubuntu 24.04.4 LTS, kernel 6.17.0-1018-nvidia |
 | **rpi5p** | n8n, OpenProject 운영 | — |
 
 ### 네트워크
@@ -396,6 +410,28 @@ python3 /opt/hermes-ra/nas_indexer.py --force-reindex
 
 ## 문제 해결
 
+### Hermes TUI 응답 없음 (config 오류)
+
+config.yaml의 model 설정이 잘못된 경우 `TypeError: 'NoneType' object is not iterable` 오류가 발생합니다.
+
+```bash
+# 현재 model 설정 확인
+grep -A4 '^model:' ~/.hermes/config.yaml
+```
+
+정상 설정값 (T3610 기준):
+
+```yaml
+model:
+  default: qwen3:30b
+  provider: custom
+  base_url: http://192.168.100.1:11434/v1
+  ollama_num_ctx: 65536
+```
+
+> 이력: 2026-05-27 `gpt-5.3-codex` → ChatGPT 비공식 API 설정으로 TUI 완전 불통 → GX10 재부팅 + 설정 복구.  
+> 상세: [docs/ops/2026-05-27-gx10-gpu-recovery.md](docs/ops/2026-05-27-gx10-gpu-recovery.md)
+
 ### Qdrant 컨테이너가 없을 때
 
 ```bash
@@ -453,7 +489,8 @@ curl -s http://192.168.100.1:11434/api/tags | python3 -c \
 
 ---
 
-**Last Updated**: 2026-05-22  
-**T3610 AI 엔진**: Nous Research Hermes Agent v0.13.0  
+**Last Updated**: 2026-05-27  
+**T3610 AI 엔진**: Nous Research Hermes Agent v0.14.0  
+**LLM**: qwen3:30b (GX10 NVIDIA GB10 GPU, 65K ctx, ~24 tokens/sec)  
 **지식소스**: NAS Qdrant (Docker) + ra-project + MD-process (3계층)  
 **임베딩**: qwen3-embedding:latest (GX10 Ollama, 4096dim)

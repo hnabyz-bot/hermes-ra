@@ -27,10 +27,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
-> **[2026-05-11 AI 엔진 전환 선언]**
-> T3610 서버의 Hermes RA Agent AI 엔진은 **Nous Research Hermes Agent v0.13.0** 으로 전환되었다.
-> `hermes-oauth-gateway/`, `hermes-ra-api/` 는 rpi5p 아카이브이며
-> T3610에서는 사용하지 않는다.
+> **[2026-05-27 AI 엔진 현황]**
+> T3610 서버의 Hermes RA Agent AI 엔진: **Nous Research Hermes Agent v0.14.0**
+> LLM: **qwen3:30b** (GX10 NVIDIA GB10, provider: custom, base_url: GX10 Ollama, ollama_num_ctx: 65536)
+> `hermes-oauth-gateway/`, `hermes-ra-api/` 는 rpi5p 아카이브이며 T3610에서는 사용하지 않는다.
 
 ---
 
@@ -49,10 +49,14 @@ T3610의 Hermes를 **지구최강 의료기기 RA 전문가**로 성장시키는
 | 항목 | 경로/값 |
 |------|---------|
 | 바이너리 | `~/.local/bin/hermes` |
+| 버전 | v0.14.0 |
 | 설정 파일 | `~/.hermes/config.yaml` |
 | RA 스킬 경로 | `~/.hermes/skills/ra-expert/` |
 | 로그 | `~/.hermes/logs/agent.log` |
-| 기본 모델 | Hermes Agent 내부 설정 (~/.hermes/config.yaml model.default) |
+| LLM 모델 | `qwen3:30b` (provider: custom, GX10 Ollama) |
+| LLM 엔드포인트 | `http://192.168.100.1:11434/v1` |
+| 컨텍스트 윈도우 | 65,536 tokens (`model.ollama_num_ctx: 65536`) |
+| GX10 GPU | NVIDIA GB10 (kernel: 6.17.0-1018-nvidia) |
 
 ---
 
