@@ -142,10 +142,14 @@ import sys,json; d=json.load(sys.stdin)
 for m in d.get('models',[]): print(m['name'], m['size_vram']//1024//1024,'MB VRAM')
 " 2>/dev/null || echo "Ollama 연결 실패"
 
-# 7. Hermes config 확인 (model 섹션)
+# 7. Hermes config 확인 (model 섹션 + reasoning_effort)
 grep -A5 '^model:' ~/.hermes/config.yaml
+grep 'reasoning_effort' ~/.hermes/config.yaml
 
-# 8. Hermes oneshot 확인 (RA 스킬 포함)
+# 8. hermes-api-server 타임아웃 확인 (qwen3:30b는 900초 필요)
+grep 'HERMES_TIMEOUT' /opt/hermes-ra/.env
+
+# 9. Hermes oneshot 확인 (RA 스킬 포함, ~5분 소요)
 hermes -z "MFDS 의료기기 소프트웨어 허가 요건을 간략히 알려줘" --skills ra-expert
 ```
 

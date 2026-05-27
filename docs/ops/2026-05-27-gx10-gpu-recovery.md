@@ -118,6 +118,27 @@ model:
 | GX10 VRAM (embedding) | 14.7GB |
 | 전체 메모리 (통합) | ~83GB / 128GB |
 | RA 스킬 질의 | 정상 응답 (MFDS/CE MDR/FDA 분류 기준 등) |
+| E2E 파이프라인 응답 시간 | 5분 25초 (hermes-api-server :8643 → hermes -z → qwen3:30b) |
+| 실 RA 케이스 검증 | HAD1717MC MFDS 2등급, 허가번호 제인 19-5014호, NAS 출처 5건 |
+
+---
+
+## 4차 조치: HERMES_TIMEOUT 확장
+
+**발생 시각**: 2026-05-27 (E2E 검증 중)
+
+qwen3:30b 응답 속도(API 1회당 55초~)로 인해 `hermes-api-server.py`의 기본 타임아웃 300초가 부족.
+`/opt/hermes-ra/.env` 수정:
+
+```bash
+# 변경 전
+HERMES_TIMEOUT=300
+
+# 변경 후
+HERMES_TIMEOUT=900   # qwen3:30b reasoning 시간(~5분) 수용
+```
+
+hermes-api-server 재시작 후 E2E 검증 성공.
 
 ---
 
@@ -137,6 +158,16 @@ model:
   provider: custom
   base_url: http://192.168.100.1:11434/v1
   ollama_num_ctx: 65536
+
+agent:
+  reasoning_effort: none   # qwen3 thinking 비활성화 (응답 시간 단축)
 ```
 
-> Hermes v0.14.0 + GX10 NVIDIA GB10 기준 검증 완료 (2026-05-27)
+`/opt/hermes-ra/.env`:
+
+```bash
+HERMES_TIMEOUT=900   # qwen3:30b 응답 시간 수용 (기본 300 → 900)
+```
+
+> Hermes v0.14.0 + GX10 NVIDIA GB10 기준 E2E 검증 완료 (2026-05-27)
+> HAD1717MC MFDS 2등급 케이스 전체 파이프라인 정상 동작 확인
