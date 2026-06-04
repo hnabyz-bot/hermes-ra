@@ -7,12 +7,13 @@ Usage:
   d.patch_node_code(wf_id, node_name, new_jscode)
   d.create_workflow(wf_json)
 """
+import os
 import sys
 import json
 import requests
 
-N8N_BASE = "http://localhost:5678/api/v1"
-N8N_KEY  = "***REDACTED***"
+N8N_BASE = os.environ.get("N8N_BASE_URL", "http://localhost:5678/api/v1")
+N8N_KEY  = os.environ.get("N8N_API_KEY", "")
 
 class N8nDeploy:
     def __init__(self, base=N8N_BASE, key=N8N_KEY):
