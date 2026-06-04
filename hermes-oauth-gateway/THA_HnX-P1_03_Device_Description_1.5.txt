@@ -1,8 +1,0 @@
-Device Description — Section 1.5
-
-Per TFDA request: mark as N/A and remove the associated table.
-
-Statement for submission package:
-"Device Description — Section 1.5: Not Applicable. The originally referenced table has been removed from the device description as it is not applicable to the HnX-P1 portable x-ray system."
-
-Include version history noting removal and approval (name, role, date).

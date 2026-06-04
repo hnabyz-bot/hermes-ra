@@ -143,6 +143,10 @@ def build_context(messages: list[dict], metadata: dict, rag_results: list[dict],
         parts.append("")
         parts.append("이 이메일과 관련 있는 WP가 있으면 matched_wp_id에 숫자로 반환하세요. 없으면 null.")
 
+    parts.append("")
+    parts.append("## 출력 지시")
+    parts.append("반드시 다음 JSON 형식으로만 응답하세요 (다른 텍스트 금지, 마크다운 코드블록 금지):")
+    parts.append('{"wp_comment": {"email_type": "완료통보|액션필요|정보수신", "wp_title": "...", "summary": "...", "recommendation": "...", "confidence": 0.9, "deadline": null, "product": "...", "org": "...", "matched_wp_id": null}}')
     return "\n".join(parts)
 
 
