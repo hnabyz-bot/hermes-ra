@@ -1,3 +1,8 @@
+> **[DEPRECATED — 2026-06-08]**
+> 이 레포는 **아카이브 예정**입니다. ra-hermes-multi-agent 멀티 에이전트 시스템이 MVP 검증을 완료했습니다.
+> 운영 스크립트 5종은 [ra-hermes-multi-agent/scripts/](https://github.com/holee9/ra-hermes-multi-agent/tree/main/scripts)로 이전 완료.
+> 관련 이슈: holee9/ra-hermes-multi-agent#14
+
 # Hermes RA — Regulatory Affairs AI Agent
 
 [![Latest Release](https://img.shields.io/github/v/release/hnabyz-bot/hermes-ra)](https://github.com/hnabyz-bot/hermes-ra/releases)
